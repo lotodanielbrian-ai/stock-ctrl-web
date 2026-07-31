@@ -38,9 +38,9 @@ export function UsuariosView() {
     setErr("");
   };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.username.trim() || !form.password.trim()) {
+    if (!form.name.trim() || !form.username.trim() || (!editingId && !form.password?.trim())) {
       setErr("Por favor completá los campos requeridos (Nombre, Usuario y Contraseña).");
       return;
     }
@@ -58,14 +58,14 @@ export function UsuariosView() {
       id: editingId || Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       name: form.name.trim(),
       username: form.username.trim().toLowerCase(),
-      password: form.password.trim(),
+      password: (form.password || "").trim(),
       role: form.role,
       salary: Number(form.salary) || 0,
       commissionRate: Number(form.commissionRate) || 0,
     };
 
     try {
-      handleSaveUser(payload);
+      await handleSaveUser(payload, !editingId);
       addToast(editingId ? "Usuario actualizado" : "Usuario creado", "success");
       cancel();
     } catch (e) {
@@ -144,13 +144,13 @@ export function UsuariosView() {
             style={inputStyle}
           />
 
-          <label style={labelStyle}>CONTRASEÑA</label>
+          <label style={labelStyle}>{editingId ? "NUEVA CONTRASEÑA (Dejar en blanco para no cambiar)" : "CONTRASEÑA"}</label>
           <input
-            required
+            required={!editingId}
             type="text"
-            value={form.password}
+            value={form.password || ""}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder="••••••••"
+            placeholder={editingId ? "••••••••" : "Ej: ventas123"}
             className="sc-focus sc-mono"
             style={inputStyle}
           />

@@ -200,23 +200,26 @@ export function DataProvider({ children }) {
   }, [online, refreshProducts]);
 
   // ---- User CRUD ----
-  const handleSaveUser = useCallback(async (userPayload) => {
+  const handleSaveUser = useCallback(async (userPayload, isNew) => {
     if (online) {
-      await userService.updateProfile(userPayload.id, userPayload);
+      if (isNew) {
+        await userService.adminCreateUser(userPayload);
+      } else {
+        await userService.adminUpdateUser(userPayload);
+      }
       const usrs = await userService.getUsers();
       setUsers(usrs);
     } else {
       setUsers(prev => {
-        const exists = prev.some(u => u.id === userPayload.id);
-        if (exists) return prev.map(u => u.id === userPayload.id ? userPayload : u);
-        return [...prev, userPayload];
+        if (isNew) return [...prev, userPayload];
+        return prev.map(u => u.id === userPayload.id ? userPayload : u);
       });
     }
   }, [online]);
 
   const handleDeleteUser = useCallback(async (userId) => {
     if (online) {
-      await userService.deleteUser(userId);
+      await userService.adminDeleteUser(userId);
       const usrs = await userService.getUsers();
       setUsers(usrs);
     } else {
