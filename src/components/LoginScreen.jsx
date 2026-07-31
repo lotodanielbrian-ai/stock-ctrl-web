@@ -168,39 +168,6 @@ export function LoginScreen() {
           )}
         </button>
 
-        {!isOnline && (
-          <>
-            <div style={{
-              marginTop: 22,
-              paddingTop: 16,
-              borderTop: "1px solid var(--border-soft)",
-              fontSize: 10.5,
-              color: "var(--text-faint)",
-              lineHeight: 1.6,
-            }}>
-              Modo Offline (Demo): admin / admin123 · vendedor1 / venta123.
-            </div>
-
-            <button
-              type="button"
-              onClick={doReset}
-              className="sc-btn sc-focus"
-              style={{
-                marginTop: 12,
-                width: "100%",
-                background: "transparent",
-                border: "1px solid var(--border)",
-                color: justReset ? "var(--green)" : "var(--text-faint)",
-                borderRadius: 6,
-                padding: "7px 0",
-                fontSize: 11,
-                cursor: "pointer",
-              }}
-            >
-              {justReset ? "Usuarios restablecidos ✓ — probá de nuevo" : "¿No podés entrar? Restablecer usuarios de fábrica"}
-            </button>
-          </>
-        )}
       </div>
       
       {/* Loading spinner keyframes */}
