@@ -1,0 +1,17 @@
+{
+  "short_name": "STOCK//CTRL",
+  "name": "STOCK//CTRL Sistema de Gestión",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#12151A",
+  "background_color": "#12151A",
+  "orientation": "portrait",
+  "description": "Sistema profesional para control de stock, inventario y registro de ventas."
+}
