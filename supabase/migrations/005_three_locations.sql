@@ -13,11 +13,11 @@ BEGIN
     END IF;
 END $$;
 
--- Add new columns to products
+-- Add new columns to products (idempotent)
 ALTER TABLE public.products
-ADD COLUMN stock_local_1 INTEGER NOT NULL DEFAULT 0 CHECK (stock_local_1 >= 0),
-ADD COLUMN stock_local_2 INTEGER NOT NULL DEFAULT 0 CHECK (stock_local_2 >= 0),
-ADD COLUMN stock_deposito INTEGER NOT NULL DEFAULT 0 CHECK (stock_deposito >= 0);
+ADD COLUMN IF NOT EXISTS stock_local_1 INTEGER NOT NULL DEFAULT 0 CHECK (stock_local_1 >= 0),
+ADD COLUMN IF NOT EXISTS stock_local_2 INTEGER NOT NULL DEFAULT 0 CHECK (stock_local_2 >= 0),
+ADD COLUMN IF NOT EXISTS stock_deposito INTEGER NOT NULL DEFAULT 0 CHECK (stock_deposito >= 0);
 
 -- Migrate existing 'quantity' to 'stock_local_1'
 UPDATE public.products
@@ -39,7 +39,7 @@ FOR EACH ROW EXECUTE FUNCTION public.sync_total_quantity();
 
 -- Add assigned_location to profiles
 ALTER TABLE public.profiles
-ADD COLUMN assigned_location TEXT NOT NULL DEFAULT 'local1' CHECK (assigned_location IN ('local1', 'local2', 'deposito'));
+ADD COLUMN IF NOT EXISTS assigned_location TEXT NOT NULL DEFAULT 'local1' CHECK (assigned_location IN ('local1', 'local2', 'deposito'));
 
 -- Update trigger for new users to set assigned_location
 CREATE OR REPLACE FUNCTION public.handle_new_user()
