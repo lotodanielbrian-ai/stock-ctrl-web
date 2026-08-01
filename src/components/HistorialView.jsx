@@ -13,7 +13,7 @@ export function HistorialView() {
   const { currentUser, isAdmin } = useAuth();
 
   const [filterPeriod, setFilterPeriod] = useState("mes"); // "hoy" | "semana" | "mes" | "todo"
-  const [filterUser, setFilterUser] = useState("all");
+  const [filterUser, setFilterUser] = useState(isAdmin ? "all" : currentUser.id);
   const [filterPayment, setFilterPayment] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -317,21 +317,23 @@ export function HistorialView() {
           ))}
         </div>
 
-        {/* User Dropdown Filter */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <Users size={14} color="var(--text-faint)" />
-          <select
-            value={filterUser}
-            onChange={(e) => { setFilterUser(e.target.value); setPage(1); }}
-            className="sc-focus"
-            style={{ ...inputStyle, padding: "6px 10px" }}
-          >
-            <option value="all">Todos los vendedores</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.name} ({u.username})</option>
-            ))}
-          </select>
-        </div>
+        {/* User Dropdown Filter - Only for Admins */}
+        {isAdmin && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Users size={14} color="var(--text-faint)" />
+            <select
+              value={filterUser}
+              onChange={(e) => { setFilterUser(e.target.value); setPage(1); }}
+              className="sc-focus"
+              style={{ ...inputStyle, padding: "6px 10px" }}
+            >
+              <option value="all">Todos los vendedores</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.name} ({u.username})</option>
+              ))}
+            </select>
+          </div>
+        )}
         
         {/* Payment Dropdown Filter */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
