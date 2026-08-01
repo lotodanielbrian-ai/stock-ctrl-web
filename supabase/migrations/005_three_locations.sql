@@ -139,16 +139,20 @@ BEGIN
     p_payment_method, p_payment_detail, v_user.id, v_user.full_name
   ) RETURNING id INTO v_sale_id;
 
-  -- Calcular comisión
+  -- Calcular revenue para el response
   v_revenue := v_product.public_price * p_qty;
-  INSERT INTO public.commissions (
-    user_id, sale_id, amount, rate, is_paid
-  ) VALUES (
-    v_user.id,
-    v_sale_id,
-    ROUND(v_revenue * (v_user.commission_rate / 100), 2),
-    v_user.commission_rate,
-    false
+
+  -- Registrar en audit log
+  INSERT INTO public.audit_log (user_id, action, table_name, record_id, new_data)
+  VALUES (
+    auth.uid(), 'SALE', 'sales', v_sale_id::TEXT,
+    jsonb_build_object(
+      'product', v_product.name,
+      'qty', p_qty,
+      'revenue', v_revenue,
+      'payment', p_payment_method::TEXT,
+      'location', v_location
+    )
   );
 
   NOTIFY pgrst, 'reload schema';
