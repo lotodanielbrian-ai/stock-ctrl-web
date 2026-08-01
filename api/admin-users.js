@@ -62,15 +62,19 @@ export default async function handler(req, res) {
       
       const newUserId = authData.user.id;
       
-      const { error: updateProfileError } = await supabaseAdmin
+      const { error: upsertProfileError } = await supabaseAdmin
         .from('profiles')
-        .update({
+        .upsert({
+          id: newUserId,
+          username: payload.username,
+          full_name: payload.name,
+          role: payload.role,
           salary: payload.salary || 0,
           commission_rate: payload.commissionRate || 0,
-        })
-        .eq('id', newUserId);
+          is_active: true
+        });
 
-      if (updateProfileError) throw updateProfileError;
+      if (upsertProfileError) throw upsertProfileError;
 
       return res.status(200).json({ success: true, user: authData.user });
     } 
