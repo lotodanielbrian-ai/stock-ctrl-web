@@ -12,7 +12,8 @@ const emptyForm = {
   photo: "",
   costPrice: "",
   publicPrice: "",
-  stockLocal: "",
+  stockLocal1: "",
+  stockLocal2: "",
   stockDeposito: "",
   minStock: 5,
   category: "",
@@ -49,9 +50,9 @@ export function ProductosView() {
     setUploadErr("");
     try {
       const b64 = await resizeImage(file);
-      setForm((f) => ({ ...f, photo: b64 }));
+      setForm({ ...form, photo: b64 });
     } catch (e) {
-      setUploadErr("No se pudo procesar la imagen. Probá con otra imagen (JPG/PNG).");
+      setUploadErr("Error al cargar la imagen. Intenta con una más pequeña.");
     } finally {
       setUploading(false);
     }
@@ -66,7 +67,8 @@ export function ProductosView() {
       photo: form.photo || "",
       costPrice: Number(form.costPrice) || 0,
       publicPrice: Number(form.publicPrice) || 0,
-      stockLocal: Number(form.stockLocal) || 0,
+      stockLocal1: Number(form.stockLocal1) || 0,
+      stockLocal2: Number(form.stockLocal2) || 0,
       stockDeposito: Number(form.stockDeposito) || 0,
       minStock: Number(form.minStock) || 0,
       category: form.category ? form.category.trim() : "General",
@@ -288,11 +290,22 @@ export function ProductosView() {
 
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>STOCK LOCAL</label>
+              <label style={labelStyle}>STOCK LOCAL 1</label>
               <input
                 type="number"
-                value={form.stockLocal}
-                onChange={(e) => setForm({ ...form, stockLocal: e.target.value })}
+                value={form.stockLocal1}
+                onChange={(e) => setForm({ ...form, stockLocal1: e.target.value })}
+                placeholder="0"
+                className="sc-focus sc-mono"
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>STOCK LOCAL 2</label>
+              <input
+                type="number"
+                value={form.stockLocal2}
+                onChange={(e) => setForm({ ...form, stockLocal2: e.target.value })}
                 placeholder="0"
                 className="sc-focus sc-mono"
                 style={inputStyle}
@@ -309,8 +322,10 @@ export function ProductosView() {
                 style={inputStyle}
               />
             </div>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>STOCK MÍNIMO</label>
+              <label style={labelStyle}>STOCK MÍNIMO GLOBAL</label>
               <input
                 type="number"
                 value={form.minStock}
@@ -409,12 +424,17 @@ export function ProductosView() {
                           <td style={{ padding: "9px 12px" }}>
                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5 }}>
-                                <span style={{ color: "var(--text-dim)" }}>Local:</span>
-                                <strong className="sc-mono" style={{ color: "var(--text)" }}>{p.stockLocal}</strong>
-                                <LevelBadge level={stockLevel({ ...p, quantity: p.stockLocal })} />
+                                <span style={{ color: "var(--text-dim)" }}>L1:</span>
+                                <strong className="sc-mono" style={{ color: "var(--text)" }}>{p.stockLocal1}</strong>
+                                <LevelBadge level={stockLevel({ ...p, quantity: p.stockLocal1 })} />
                               </div>
                               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5 }}>
-                                <span style={{ color: "var(--text-dim)" }}>Depósito:</span>
+                                <span style={{ color: "var(--text-dim)" }}>L2:</span>
+                                <strong className="sc-mono" style={{ color: "var(--text)" }}>{p.stockLocal2}</strong>
+                                <LevelBadge level={stockLevel({ ...p, quantity: p.stockLocal2 })} />
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5 }}>
+                                <span style={{ color: "var(--text-dim)" }}>Dep:</span>
                                 <strong className="sc-mono" style={{ color: "var(--text)" }}>{p.stockDeposito}</strong>
                               </div>
                             </div>

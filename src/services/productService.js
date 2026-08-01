@@ -26,7 +26,8 @@ export async function getProducts() {
     costPrice: Number(p.cost_price) || 0,
     publicPrice: Number(p.public_price) || 0,
     quantity: Number(p.quantity) || 0,
-    stockLocal: Number(p.stock_local) || 0,
+    stockLocal1: Number(p.stock_local_1) || 0,
+    stockLocal2: Number(p.stock_local_2) || 0,
     stockDeposito: Number(p.stock_deposito) || 0,
     minStock: Number(p.min_stock) || 5,
     category: p.categories?.name || 'General',
@@ -51,14 +52,15 @@ export async function getProductById(id) {
   return data;
 }
 
-export async function createProduct({ name, costPrice, publicPrice, quantity, stockLocal, stockDeposito, minStock, category, barcode, photoUrl }) {
+export async function createProduct({ name, costPrice, publicPrice, quantity, stockLocal1, stockLocal2, stockDeposito, minStock, category, barcode, photoUrl }) {
   if (!isSupabaseConfigured()) throw new Error('Supabase no configurado');
 
   // Find or create category
   const categoryId = await findOrCreateCategory(category);
 
-  // If quantity is provided but not stockLocal/stockDeposito (for backward compatibility)
-  const loc = stockLocal !== undefined ? stockLocal : (quantity || 0);
+  // If quantity is provided but not stock fields (for backward compatibility)
+  const loc1 = stockLocal1 !== undefined ? stockLocal1 : (quantity || 0);
+  const loc2 = stockLocal2 !== undefined ? stockLocal2 : 0;
   const dep = stockDeposito !== undefined ? stockDeposito : 0;
 
   const { data, error } = await supabase
@@ -67,8 +69,9 @@ export async function createProduct({ name, costPrice, publicPrice, quantity, st
       name,
       cost_price: costPrice || 0,
       public_price: publicPrice || 0,
-      quantity: loc + dep,
-      stock_local: loc,
+      quantity: loc1 + loc2 + dep,
+      stock_local_1: loc1,
+      stock_local_2: loc2,
       stock_deposito: dep,
       min_stock: minStock || 5,
       category_id: categoryId,
@@ -96,7 +99,8 @@ export async function updateProduct(id, changes) {
   if (changes.costPrice !== undefined) updateData.cost_price = changes.costPrice;
   if (changes.publicPrice !== undefined) updateData.public_price = changes.publicPrice;
   if (changes.quantity !== undefined) updateData.quantity = changes.quantity;
-  if (changes.stockLocal !== undefined) updateData.stock_local = changes.stockLocal;
+  if (changes.stockLocal1 !== undefined) updateData.stock_local_1 = changes.stockLocal1;
+  if (changes.stockLocal2 !== undefined) updateData.stock_local_2 = changes.stockLocal2;
   if (changes.stockDeposito !== undefined) updateData.stock_deposito = changes.stockDeposito;
   if (changes.minStock !== undefined) updateData.min_stock = changes.minStock;
   if (changes.barcode !== undefined) updateData.barcode = changes.barcode || null;

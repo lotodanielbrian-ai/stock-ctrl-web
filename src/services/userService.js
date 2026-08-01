@@ -17,6 +17,7 @@ export async function getUsers() {
     role: u.role,
     salary: Number(u.salary) || 0,
     commissionRate: Number(u.commission_rate) || 0,
+    assignedLocation: u.assigned_location || 'local1',
     isActive: u.is_active,
     createdAt: u.created_at,
   }));

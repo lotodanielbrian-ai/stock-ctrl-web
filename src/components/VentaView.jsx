@@ -56,7 +56,7 @@ export function VentaView() {
     
     setIsSelling(true);
     try {
-      await handleSell(selected.id, q, currentUser, paymentMethod);
+      await handleSell(selected.id, q, currentUser, currentUser.assignedLocation, paymentMethod);
       addToast(`Venta registrada: ${q} × ${selected.name}`, "success");
       setQty(1);
       setProductId("");
@@ -103,7 +103,7 @@ export function VentaView() {
     
     setIsSelling(true);
     try {
-      await handleSell(product.id, 1, currentUser, paymentMethod);
+      await handleSell(product.id, 1, currentUser, currentUser.assignedLocation, paymentMethod);
       addToast(`Vendido: ${product.name} ($${fmtMoney(product.publicPrice)})`, "success");
     } catch (e) {
       addToast(e.message, "error");
@@ -124,7 +124,7 @@ export function VentaView() {
     
     setIsSelling(true);
     try {
-      await handleSell(product.id, 1, currentUser, paymentMethod);
+      await handleSell(product.id, 1, currentUser, currentUser.assignedLocation, paymentMethod);
       addToast(`Vendido: ${product.name} ($${fmtMoney(product.publicPrice)})`, "success");
     } catch (e) {
       addToast(e.message, "error");
@@ -149,7 +149,7 @@ export function VentaView() {
         <HelpTag text="Modo escáner o búsqueda manual. Elegí el producto, ajustá la cantidad y seleccioná el medio de pago." />
       </div>
       <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 16 }}>
-        Operación a nombre de <strong style={{ color: "var(--cyan)" }}>{currentUser.name}</strong>.
+        Operación a nombre de <strong style={{ color: "var(--cyan)" }}>{currentUser.name}</strong>. Vendiendo desde: <strong style={{ color: "var(--green)" }}>{currentUser.assignedLocation === 'local2' ? 'Local 2' : (currentUser.assignedLocation === 'deposito' ? 'Depósito' : 'Local 1')}</strong>
       </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
@@ -283,7 +283,9 @@ export function VentaView() {
                   <div style={{ padding: 12, fontSize: 12.5, color: "var(--text-faint)" }}>No se encontraron productos.</div>
                 )}
                 {filtered.map((p) => {
-                  const outOfStock = (Number(p.stockLocal) || 0) <= 0;
+                  const stockField = currentUser.assignedLocation === 'local2' ? 'stockLocal2' : (currentUser.assignedLocation === 'deposito' ? 'stockDeposito' : 'stockLocal1');
+                  const availableStock = Number(p[stockField]) || 0;
+                  const outOfStock = availableStock <= 0;
                   const disabled = outOfStock && !isAdmin;
                   return (
                     <div
@@ -305,10 +307,10 @@ export function VentaView() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
                         <div className="sc-mono" style={{ fontSize: 11, color: "var(--text-faint)" }}>
-                          {disabled ? "Sin stock disponible en local" : `Stock local: ${p.stockLocal} · $${fmtMoney(p.publicPrice)}`}
+                          {disabled ? "Sin stock disponible en tu sucursal" : `Stock en tu sucursal: ${availableStock} · $${fmtMoney(p.publicPrice)}`}
                         </div>
                       </div>
-                      {disabled ? <Ban size={14} color="var(--red)" /> : <LevelBadge level={stockLevel({ ...p, quantity: p.stockLocal })} />}
+                      {disabled ? <Ban size={14} color="var(--red)" /> : <LevelBadge level={stockLevel({ ...p, quantity: availableStock })} />}
                     </div>
                   );
                 })}
@@ -330,7 +332,9 @@ export function VentaView() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.name}</div>
                   <div className="sc-mono" style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>
-                    Stock local: <strong style={{ color: "var(--cyan)" }}>{selected.stockLocal} u.</strong> · Precio: <strong style={{ color: "var(--green)" }}>${fmtMoney(selected.publicPrice)}</strong>
+                    Stock en tu sucursal: <strong style={{ color: "var(--cyan)" }}>
+                      {selected[currentUser.assignedLocation === 'local2' ? 'stockLocal2' : (currentUser.assignedLocation === 'deposito' ? 'stockDeposito' : 'stockLocal1')] || 0} u.
+                    </strong> · Precio: <strong style={{ color: "var(--green)" }}>${fmtMoney(selected.publicPrice)}</strong>
                   </div>
                 </div>
                 <button type="button" onClick={() => setProductId("")} className="sc-btn" style={{

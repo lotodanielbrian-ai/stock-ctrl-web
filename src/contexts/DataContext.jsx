@@ -100,9 +100,9 @@ export function DataProvider({ children }) {
   }, [online]);
 
   // ---- Sell operation ----
-  const handleSell = useCallback(async (productId, qty, user, paymentMethod = 'efectivo', paymentDetail = '') => {
+  const handleSell = useCallback(async (productId, qty, user, location = 'local1', paymentMethod = 'efectivo', paymentDetail = '') => {
     if (online) {
-      const result = await saleService.registerSale(productId, qty, paymentMethod, paymentDetail);
+      const result = await saleService.registerSale(productId, qty, location, paymentMethod, paymentDetail);
       // Refresh products to get updated stock
       await refreshProducts();
       return result;
@@ -110,11 +110,13 @@ export function DataProvider({ children }) {
       // Offline mode
       const product = products.find((p) => p.id === productId);
       if (!product) throw new Error('Producto no encontrado');
-      if (product.quantity < qty) throw new Error(`Stock insuficiente. Disponible: ${product.quantity}`);
+      
+      const stockField = location === 'local1' ? 'stockLocal1' : 'stockLocal2';
+      if (product[stockField] < qty) throw new Error(`Stock insuficiente. Disponible: ${product[stockField]}`);
 
-      const newQty = Math.max(0, product.quantity - qty);
+      const newQty = Math.max(0, product[stockField] - qty);
       setProducts(prev => prev.map(p =>
-        p.id === productId ? { ...p, quantity: newQty } : p
+        p.id === productId ? { ...p, [stockField]: newQty, quantity: Math.max(0, p.quantity - qty) } : p
       ));
 
       const newSale = {
@@ -137,15 +139,17 @@ export function DataProvider({ children }) {
   }, [online, products, refreshProducts]);
 
   // ---- Restock operation ----
-  const handleRestock = useCallback(async (productId, addedQty) => {
+  const handleRestock = useCallback(async (productId, addedQty, location = 'deposito') => {
     if (online) {
-      await saleService.restockProduct(productId, addedQty);
+      await saleService.restockProduct(productId, addedQty, location);
       await refreshProducts();
     } else {
       setProducts(prev => prev.map(p => {
         if (p.id === productId) {
+          const locField = location === 'local1' ? 'stockLocal1' : location === 'local2' ? 'stockLocal2' : 'stockDeposito';
           return {
             ...p,
+            [locField]: (Number(p[locField]) || 0) + Number(addedQty),
             quantity: (Number(p.quantity) || 0) + Number(addedQty),
             lastRestock: new Date().toISOString(),
           };
@@ -163,7 +167,8 @@ export function DataProvider({ children }) {
           name: productPayload.name,
           costPrice: productPayload.costPrice,
           publicPrice: productPayload.publicPrice,
-          stockLocal: productPayload.stockLocal,
+          stockLocal1: productPayload.stockLocal1,
+          stockLocal2: productPayload.stockLocal2,
           stockDeposito: productPayload.stockDeposito,
           minStock: productPayload.minStock,
           category: productPayload.category,
@@ -175,7 +180,8 @@ export function DataProvider({ children }) {
           name: productPayload.name,
           costPrice: productPayload.costPrice,
           publicPrice: productPayload.publicPrice,
-          stockLocal: productPayload.stockLocal,
+          stockLocal1: productPayload.stockLocal1,
+          stockLocal2: productPayload.stockLocal2,
           stockDeposito: productPayload.stockDeposito,
           minStock: productPayload.minStock,
           category: productPayload.category,

@@ -5,7 +5,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
  * Uses the atomic `register_sale` PostgreSQL function for safe stock deduction.
  */
 
-export async function registerSale(productId, qty, paymentMethod = 'efectivo', paymentDetail = '') {
+export async function registerSale(productId, qty, location = 'local1', paymentMethod = 'efectivo', paymentDetail = '') {
   if (!isSupabaseConfigured()) throw new Error('Supabase no configurado');
 
   const { data, error } = await supabase.rpc('register_sale', {
@@ -13,6 +13,7 @@ export async function registerSale(productId, qty, paymentMethod = 'efectivo', p
     p_qty: qty,
     p_payment_method: paymentMethod,
     p_payment_detail: paymentDetail || '',
+    p_location: location,
   });
 
   if (error) {

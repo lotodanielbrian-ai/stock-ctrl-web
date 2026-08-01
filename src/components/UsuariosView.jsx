@@ -15,6 +15,7 @@ const emptyUser = {
   role: "vendedor",
   salary: 180000,
   commissionRate: 2.5,
+  assignedLocation: "local1",
 };
 
 export function UsuariosView() {
@@ -28,7 +29,7 @@ export function UsuariosView() {
 
   const startEdit = (u) => {
     setEditingId(u.id);
-    setForm({ ...u });
+    setForm({ ...u, assignedLocation: u.assignedLocation || "local1" });
     setErr("");
   };
 
@@ -62,6 +63,7 @@ export function UsuariosView() {
       role: form.role,
       salary: Number(form.salary) || 0,
       commissionRate: Number(form.commissionRate) || 0,
+      assignedLocation: form.assignedLocation || "local1",
     };
 
     try {
@@ -195,6 +197,18 @@ export function UsuariosView() {
               </div>
             </>
           )}
+
+          <label style={labelStyle}>SUCURSAL ASIGNADA</label>
+          <select
+            value={form.assignedLocation}
+            onChange={(e) => setForm({ ...form, assignedLocation: e.target.value })}
+            className="sc-focus"
+            style={inputStyle}
+          >
+            <option value="local1">Local 1</option>
+            <option value="local2">Local 2</option>
+            <option value="deposito">Depósito</option>
+          </select>
 
           {err && <div style={{ fontSize: 11.5, color: "var(--red)", marginTop: 10, fontWeight: 500 }}>{err}</div>}
 

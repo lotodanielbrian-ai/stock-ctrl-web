@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Acceso denegado: Se requieren permisos de administrador' });
     }
 
-    if (action === 'create') {
+      if (action === 'create') {
       const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: payload.username + '@toty.com',
         password: payload.password,
@@ -55,6 +55,7 @@ export default async function handler(req, res) {
           username: payload.username,
           full_name: payload.name,
           role: payload.role,
+          assignedLocation: payload.assignedLocation || 'local1',
         }
       });
 
@@ -71,6 +72,7 @@ export default async function handler(req, res) {
           role: payload.role,
           salary: payload.salary || 0,
           commission_rate: payload.commissionRate || 0,
+          assigned_location: payload.assignedLocation || 'local1',
           is_active: true
         });
 
@@ -88,6 +90,7 @@ export default async function handler(req, res) {
         if (passwordError) throw passwordError;
       }
 
+      // If we are updating location or role, maybe update auth metadata too if we wanted, but updating profiles table is enough for the app
       const { data: updatedProfile, error: updateError } = await supabaseAdmin
         .from('profiles')
         .update({
@@ -96,6 +99,7 @@ export default async function handler(req, res) {
           role: payload.role,
           salary: payload.salary,
           commission_rate: payload.commissionRate,
+          assigned_location: payload.assignedLocation,
         })
         .eq('id', payload.id)
         .select()
