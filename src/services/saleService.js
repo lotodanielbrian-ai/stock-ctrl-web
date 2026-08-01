@@ -13,7 +13,6 @@ export async function registerSale(productId, qty, location = 'local1', paymentM
     p_qty: qty,
     p_payment_method: paymentMethod,
     p_payment_detail: paymentDetail || '',
-    p_location: location,
   });
 
   if (error) {
@@ -31,12 +30,13 @@ export async function registerSale(productId, qty, location = 'local1', paymentM
   return data;
 }
 
-export async function restockProduct(productId, qty) {
+export async function restockProduct(productId, qty, location = 'deposito') {
   if (!isSupabaseConfigured()) throw new Error('Supabase no configurado');
 
   const { data, error } = await supabase.rpc('restock_product', {
     p_product_id: productId,
     p_qty: qty,
+    p_location: location,
   });
 
   if (error) throw new Error(error.message);
