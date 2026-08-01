@@ -159,6 +159,44 @@ export function DataProvider({ children }) {
     }
   }, [online, refreshProducts]);
 
+  // ---- Undo sale operation ----
+  const handleUndoSale = useCallback(async (saleId, productId, qty, location = 'local1') => {
+    if (online) {
+      await saleService.deleteSaleRecord(saleId);
+      await saleService.restockProduct(productId, qty, location);
+      await refreshProducts();
+    } else {
+      setSales(prev => prev.filter(s => s.id !== saleId));
+      setProducts(prev => prev.map(p => {
+        if (p.id === productId) {
+          const locField = location === 'local1' ? 'stockLocal1' : 'stockLocal2';
+          return {
+            ...p,
+            [locField]: (Number(p[locField]) || 0) + Number(qty),
+            quantity: (Number(p.quantity) || 0) + Number(qty),
+          };
+        }
+        return p;
+      }));
+    }
+  }, [online, refreshProducts]);
+
+  // ---- Update sale payment method ----
+  const handleUpdatePaymentMethod = useCallback(async (saleIds, paymentMethod) => {
+    if (online) {
+      await saleService.updateSalesPaymentMethod(saleIds, paymentMethod);
+      // optionally refresh sales if we were caching them, but they are fetched on demand
+    } else {
+      setSales(prev => prev.map(s => {
+        if (saleIds.includes(s.id)) {
+          return { ...s, paymentMethod };
+        }
+        return s;
+      }));
+    }
+  }, [online]);
+
+
   // ---- Product CRUD ----
   const handleSaveProduct = useCallback(async (productPayload, isNew) => {
     if (online) {
@@ -248,6 +286,8 @@ export function DataProvider({ children }) {
     handleDeleteProduct,
     handleSaveUser,
     handleDeleteUser,
+    handleUpdatePaymentMethod,
+    handleUndoSale,
     refreshProducts,
     setSales,
   };

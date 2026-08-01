@@ -187,3 +187,25 @@ body {
     padding: 16px !important;
   }
 }
+
+/* Purchase List Styles */
+.purchase-list {
+  scroll-behavior: smooth;
+}
+.purchase-item {
+  transition: transform .15s ease, border-color .15s ease;
+}
+.purchase-item:hover {
+  border-color: var(--cyan);
+  transform: translateX(2px);
+}
+.purchase-item-remove:hover {
+  background: rgba(229, 89, 95, 0.15) !important;
+}
+.purchase-confirm-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 255, 170, 0.25) !important;
+}
+.purchase-confirm-btn:active:not(:disabled) {
+  transform: translateY(0);
+}

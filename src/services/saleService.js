@@ -43,6 +43,26 @@ export async function restockProduct(productId, qty, location = 'deposito') {
   return data;
 }
 
+export async function deleteSaleRecord(saleId) {
+  if (!isSupabaseConfigured()) return;
+  const { error } = await supabase.from('sales').delete().eq('id', saleId);
+  if (error) throw new Error(error.message);
+}
+
+export async function updateSalesPaymentMethod(saleIds, paymentMethod) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase no configurado');
+
+  if (!saleIds || saleIds.length === 0) return { success: true, updated: 0 };
+
+  const { data, error } = await supabase.rpc('update_sale_payment', {
+    p_sale_ids: saleIds,
+    p_payment_method: paymentMethod,
+  });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 /**
  * Fetch sales history with optional filters.
  * @param {Object} filters
