@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Package, AlertTriangle, ShoppingCart, ClipboardList, Users, LogOut,
-  ChevronsLeft, ChevronsRight, BarChart3, Wallet, Boxes
+  ChevronsLeft, ChevronsRight, BarChart3, Wallet, Boxes, Palette
 } from "lucide-react";
 
 export const NAV_ITEMS = [
@@ -18,6 +18,18 @@ export const NAV_ITEMS = [
 export function Sidebar({ view, setView, user, onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
   const w = collapsed ? 68 : 220;
+
+  const [theme, setTheme] = useState(() => localStorage.getItem("sc-theme") || "dark");
+
+  React.useEffect(() => {
+    if (theme === "pink") {
+      document.body.classList.add("theme-pink");
+    } else {
+      document.body.classList.remove("theme-pink");
+    }
+    localStorage.setItem("sc-theme", theme);
+  }, [theme]);
+
 
   return (
     <div style={{
@@ -180,6 +192,23 @@ export function Sidebar({ view, setView, user, onLogout }) {
             </div>
           )}
         </div>
+        <button onClick={() => setTheme(theme === 'pink' ? 'dark' : 'pink')} className="sc-btn sc-focus" title={collapsed ? "Cambiar Skin" : undefined} style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: collapsed ? "center" : "flex-start",
+          gap: 8,
+          padding: collapsed ? "8px 0" : "8px 10px",
+          borderRadius: 7,
+          border: "1px solid var(--border)",
+          background: "transparent",
+          color: "var(--text-dim)",
+          fontSize: 12.5,
+          cursor: "pointer",
+          marginBottom: 6,
+        }}>
+          <Palette size={13} style={{ flexShrink: 0 }} /> {!collapsed && (theme === 'pink' ? "Skin: Pink" : "Skin: Dark")}
+        </button>
         <button onClick={onLogout} className="sc-btn sc-focus" title={collapsed ? "Cerrar sesión" : undefined} style={{
           width: "100%",
           display: "flex",

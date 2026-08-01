@@ -21,6 +21,23 @@
   --green: #3ECF8E;
 }
 
+.theme-pink {
+  --bg: #FDF1F4;
+  --panel: #FFFFFF;
+  --panel-alt: #F9E8EC;
+  --border: #F0D6DB;
+  --border-soft: #F5E1E5;
+  --text: #3A2E31;
+  --text-dim: #736165;
+  --text-faint: #9C8C90;
+  --cyan: #D96B85;
+  --cyan-glow: rgba(217, 107, 133, 0.15);
+  --amber: #E59247;
+  --orange: #E06A42;
+  --red: #D94A58;
+  --green: #47B578;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
