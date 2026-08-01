@@ -133,10 +133,10 @@ BEGIN
   -- Registrar venta
   INSERT INTO public.sales (
     product_id, product_name, qty, unit_price, cost_price,
-    payment_method, payment_detail, user_id, user_name, user_role
+    payment_method, payment_detail, user_id, user_name
   ) VALUES (
     p_product_id, v_product.name, p_qty, v_product.public_price, v_product.cost_price,
-    p_payment_method, p_payment_detail, v_user.id, v_user.full_name, v_user.role
+    p_payment_method, p_payment_detail, v_user.id, v_user.full_name
   ) RETURNING id INTO v_sale_id;
 
   -- Calcular comisión
