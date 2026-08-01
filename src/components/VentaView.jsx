@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ShoppingCart, Search, X, Ban, CheckCircle2 } from "lucide-react";
+import { ShoppingCart, Search, X, Ban, CheckCircle2, Camera } from "lucide-react";
 import { HelpTag } from "./HelpTag";
 import { ProductThumb, LevelBadge, EmptyState } from "./GaugeBar";
 import { stockLevel, fmtMoney, saleRevenue } from "../utils/helpers";
@@ -7,6 +7,7 @@ import { useData } from "../contexts/DataContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "./Toast";
 import { PaymentSelector } from "./PaymentSelector";
+import { CameraScanner } from "./CameraScanner";
 
 function ScanBarcodeIcon() {
   return (
@@ -33,6 +34,7 @@ export function VentaView() {
   const [search, setSearch] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [isSelling, setIsSelling] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -110,6 +112,26 @@ export function VentaView() {
     }
   };
 
+  const handleCameraScan = async (code) => {
+    setShowCamera(false);
+    if (!code) return;
+    
+    const product = products.find((p) => p.barcode && p.barcode.trim() === code);
+    if (!product) {
+      addToast(`Código no reconocido: ${code}`, "error");
+      return;
+    }
+    
+    setIsSelling(true);
+    try {
+      await handleSell(product.id, 1, currentUser, paymentMethod);
+      addToast(`Vendido: ${product.name} ($${fmtMoney(product.publicPrice)})`, "success");
+    } catch (e) {
+      addToast(e.message, "error");
+    } finally {
+      setIsSelling(false);
+    }
+  };
   const inputStyle = {
     width: "100%",
     background: "var(--panel-alt)",
@@ -157,95 +179,84 @@ export function VentaView() {
 
       {products.length === 0 ? (
         <EmptyState text="No hay productos cargados todavía. El administrador debe agregar productos para poder registrar ventas." />
-      ) : mode === "escaner" ? (
-        <div>
-          <div style={{ display: "flex", gap: 20 }} className="sc-mobile-flex-col">
-            <div style={{ flex: 1 }}>
-              <div
-                onClick={() => scanRef.current && scanRef.current.focus()}
-                style={{
-                  background: "var(--panel)",
-                  border: "2px solid var(--border)",
-                  borderRadius: 10,
-                  padding: 24,
-                  textAlign: "center",
-                  cursor: "text",
-                  transition: "border-color .15s ease",
-                  boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
-                  marginBottom: 16,
-                  opacity: isSelling ? 0.6 : 1,
-                }}
-              >
-                <ScanBarcodeIcon />
-                <div style={{ fontSize: 13, color: "var(--text-dim)", margin: "12px 0 14px" }}>
-                  Apuntá con el lector óptico al código del producto
-                </div>
-                <input
-                  ref={scanRef}
-                  value={scanValue}
-                  onChange={(e) => setScanValue(e.target.value)}
-                  onKeyDown={handleScanKeyDown}
-                  onBlur={() => setTimeout(() => scanRef.current && scanRef.current.focus(), 80)}
-                  className="sc-focus sc-mono"
-                  style={{ ...inputStyle, textAlign: "center", fontSize: 17, letterSpacing: "0.08em", maxWidth: 380, margin: "0 auto" }}
-                  placeholder="Esperando escaneo..."
-                  autoFocus
-                  disabled={isSelling}
-                />
-              </div>
-            </div>
-            
-            <div style={{ width: 260, flexShrink: 0 }}>
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 9, padding: 16 }}>
-                <PaymentSelector value={paymentMethod} onChange={setPaymentMethod} compact />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 22, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 9, padding: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid var(--border-soft)" }}>
-              <span className="sc-display" style={{ fontSize: 14, fontWeight: 600 }}>Tus ventas registradas hoy</span>
-              <span className="sc-mono" style={{ fontSize: 13, color: "var(--cyan)", fontWeight: 700 }}>Total: ${fmtMoney(todayTotal)}</span>
-            </div>
-            {todaySales.length === 0 ? (
-              <div style={{ fontSize: 12, color: "var(--text-faint)", textAlign: "center", padding: "12px 0" }}>
-                Todavía no registraste ninguna venta hoy.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 240, overflowY: "auto" }}>
-                {todaySales.map((s) => {
-                  return (
-                    <div key={s.id} style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: 12.5,
-                      background: "var(--panel-alt)",
-                      border: "1px solid var(--border-soft)",
-                      borderRadius: 6,
-                      padding: "8px 12px",
-                    }}>
-                      <CheckCircle2 size={15} color="var(--green)" />
-                      <span style={{ flex: 1, fontWeight: 500 }}>{s.productName || "(producto)"}</span>
-                      <span className="sc-mono" style={{ color: "var(--text-faint)" }}>×{s.qty}</span>
-                      <span className="sc-mono" style={{ fontWeight: 600, color: "var(--text)" }}>${fmtMoney(saleRevenue(s))}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
       ) : (
-        <div style={{
-          background: "var(--panel)",
-          border: "1px solid var(--border)",
-          borderRadius: 9,
-          padding: 20,
-          boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-        }}>
-          <label style={{ fontSize: 11, color: "var(--text-dim)", display: "block", marginBottom: 6, fontWeight: 600 }}>
-            BUSCAR PRODUCTO
+        <>
+          {mode === "escaner" ? (
+            <div style={{ display: "flex", gap: 20 }} className="sc-mobile-flex-col">
+              <div style={{ flex: 1 }}>
+                <div
+                  onClick={() => scanRef.current && scanRef.current.focus()}
+                  style={{
+                    background: "var(--panel)",
+                    border: "2px solid var(--border)",
+                    borderRadius: 10,
+                    padding: 24,
+                    textAlign: "center",
+                    cursor: "text",
+                    transition: "border-color .15s ease",
+                    boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+                    marginBottom: 16,
+                    opacity: isSelling ? 0.6 : 1,
+                    position: "relative",
+                  }}
+                >
+                  <ScanBarcodeIcon />
+                  <div style={{ fontSize: 13, color: "var(--text-dim)", margin: "12px 0 14px" }}>
+                    Apuntá con el lector óptico al código del producto
+                  </div>
+                  <input
+                    ref={scanRef}
+                    value={scanValue}
+                    onChange={(e) => setScanValue(e.target.value)}
+                    onKeyDown={handleScanKeyDown}
+                    onBlur={() => setTimeout(() => scanRef.current && scanRef.current.focus(), 80)}
+                    className="sc-focus sc-mono"
+                    style={{ ...inputStyle, textAlign: "center", fontSize: 17, letterSpacing: "0.08em", maxWidth: 380, margin: "0 auto" }}
+                    placeholder="Esperando escaneo..."
+                    autoFocus
+                    disabled={isSelling}
+                  />
+
+                  <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px dashed var(--border-soft)" }}>
+                    <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 10 }}>¿No tienes lector óptico?</div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setShowCamera(true); }}
+                      className="sc-btn sc-focus"
+                      style={{
+                        background: "var(--cyan)",
+                        color: "#000",
+                        padding: "10px 20px",
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Camera size={18} />
+                      Escanear con Celular
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div style={{ width: 260, flexShrink: 0 }}>
+                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 9, padding: 16 }}>
+                  <PaymentSelector value={paymentMethod} onChange={setPaymentMethod} compact />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: 9,
+              padding: 20,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+            }}>
+              <label style={{ fontSize: 11, color: "var(--text-dim)", display: "block", marginBottom: 6, fontWeight: 600 }}>
+                BUSCAR PRODUCTO
           </label>
           <div style={{ position: "relative", marginBottom: 12 }}>
             <Search size={14} color="var(--text-faint)" style={{ position: "absolute", left: 10, top: 11 }} />
@@ -371,9 +382,52 @@ export function VentaView() {
             gap: 6,
             opacity: isSelling ? 0.7 : 1,
           }}>
-            <ShoppingCart size={16} /> {isSelling ? "Procesando..." : "Confirmar venta"}
           </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* TUS VENTAS REGISTRADAS HOY - NOW VISIBLE IN BOTH MODES */}
+      <div style={{ marginTop: 22, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 9, padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid var(--border-soft)" }}>
+          <span className="sc-display" style={{ fontSize: 14, fontWeight: 600 }}>Tus ventas registradas hoy</span>
+          <span className="sc-mono" style={{ fontSize: 13, color: "var(--cyan)", fontWeight: 700 }}>Total: ${fmtMoney(todayTotal)}</span>
         </div>
+        {todaySales.length === 0 ? (
+          <div style={{ fontSize: 12, color: "var(--text-faint)", textAlign: "center", padding: "12px 0" }}>
+            Todavía no registraste ninguna venta hoy.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 240, overflowY: "auto" }}>
+            {todaySales.map((s) => {
+              return (
+                <div key={s.id} style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  fontSize: 12.5,
+                  background: "var(--panel-alt)",
+                  border: "1px solid var(--border-soft)",
+                  borderRadius: 6,
+                  padding: "8px 12px",
+                }}>
+                  <CheckCircle2 size={15} color="var(--green)" />
+                  <span style={{ flex: 1, fontWeight: 500 }}>{s.productName || "(producto)"}</span>
+                  <span className="sc-mono" style={{ color: "var(--text-faint)" }}>×{s.qty}</span>
+                  <span className="sc-mono" style={{ fontWeight: 600, color: "var(--text)" }}>${fmtMoney(saleRevenue(s))}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {showCamera && (
+        <CameraScanner
+          onScan={handleCameraScan}
+          onClose={() => setShowCamera(false)}
+        />
       )}
     </div>
   );
