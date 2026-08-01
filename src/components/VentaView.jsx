@@ -269,81 +269,81 @@ export function VentaView() {
             />
           </div>
 
-          {!selected && search && (
-            <div style={{
-              border: "1px solid var(--border)",
-              borderRadius: 7,
-              maxHeight: 220,
-              overflowY: "auto",
-              marginBottom: 14,
-              marginTop: -6,
-              background: "var(--panel-alt)",
-            }}>
-              {filtered.length === 0 && (
-                <div style={{ padding: 12, fontSize: 12.5, color: "var(--text-faint)" }}>No se encontraron productos.</div>
-              )}
-              {filtered.map((p) => {
-                const outOfStock = (Number(p.quantity) || 0) <= 0;
-                const disabled = outOfStock && !isAdmin;
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => { if (disabled) return; setProductId(p.id); setSearch(""); }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "9px 12px",
-                      cursor: disabled ? "not-allowed" : "pointer",
-                      borderBottom: "1px solid var(--border-soft)",
-                      opacity: disabled ? 0.45 : 1,
-                      transition: "background .12s ease",
-                    }}
-                    onMouseDown={(e) => e.preventDefault()}
-                  >
-                    <ProductThumb product={p} size={28} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
-                      <div className="sc-mono" style={{ fontSize: 11, color: "var(--text-faint)" }}>
-                        {disabled ? "Sin stock disponible" : `Stock actual: ${p.quantity} · $${fmtMoney(p.publicPrice)}`}
-                      </div>
-                    </div>
-                    {disabled ? <Ban size={14} color="var(--red)" /> : <LevelBadge level={stockLevel(p)} />}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {selected && (
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              background: "var(--panel-alt)",
-              border: "1px solid var(--cyan)55",
-              borderRadius: 7,
-              padding: 12,
-              marginBottom: 16,
-            }}>
-              <ProductThumb product={selected} size={40} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.name}</div>
-                <div className="sc-mono" style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>
-                  Stock disponible: <strong style={{ color: "var(--cyan)" }}>{selected.quantity} u.</strong> · Precio: <strong style={{ color: "var(--green)" }}>${fmtMoney(selected.publicPrice)}</strong>
-                </div>
-              </div>
-              <button type="button" onClick={() => setProductId("")} className="sc-btn" style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--text-faint)",
-                cursor: "pointer",
-                padding: 4,
+            {!selected && search && (
+              <div style={{
+                border: "1px solid var(--border)",
+                borderRadius: 7,
+                maxHeight: 220,
+                overflowY: "auto",
+                marginBottom: 14,
+                marginTop: -6,
+                background: "var(--panel-alt)",
               }}>
-                <X size={16} />
-              </button>
-            </div>
-          )}
+                {filtered.length === 0 && (
+                  <div style={{ padding: 12, fontSize: 12.5, color: "var(--text-faint)" }}>No se encontraron productos.</div>
+                )}
+                {filtered.map((p) => {
+                  const outOfStock = (Number(p.stockLocal) || 0) <= 0;
+                  const disabled = outOfStock && !isAdmin;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => { if (disabled) return; setProductId(p.id); setSearch(""); }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "9px 12px",
+                        cursor: disabled ? "not-allowed" : "pointer",
+                        borderBottom: "1px solid var(--border-soft)",
+                        opacity: disabled ? 0.45 : 1,
+                        transition: "background .12s ease",
+                      }}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      <ProductThumb product={p} size={28} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
+                        <div className="sc-mono" style={{ fontSize: 11, color: "var(--text-faint)" }}>
+                          {disabled ? "Sin stock disponible en local" : `Stock local: ${p.stockLocal} · $${fmtMoney(p.publicPrice)}`}
+                        </div>
+                      </div>
+                      {disabled ? <Ban size={14} color="var(--red)" /> : <LevelBadge level={stockLevel({ ...p, quantity: p.stockLocal })} />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {selected && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                background: "var(--panel-alt)",
+                border: "1px solid var(--cyan)55",
+                borderRadius: 7,
+                padding: 12,
+                marginBottom: 16,
+              }}>
+                <ProductThumb product={selected} size={40} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.name}</div>
+                  <div className="sc-mono" style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>
+                    Stock local: <strong style={{ color: "var(--cyan)" }}>{selected.stockLocal} u.</strong> · Precio: <strong style={{ color: "var(--green)" }}>${fmtMoney(selected.publicPrice)}</strong>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setProductId("")} className="sc-btn" style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-faint)",
+                  cursor: "pointer",
+                  padding: 4,
+                }}>
+                  <X size={16} />
+                </button>
+              </div>
+            )}
 
           <div style={{ display: "flex", gap: 24 }} className="sc-mobile-flex-col">
             <div>

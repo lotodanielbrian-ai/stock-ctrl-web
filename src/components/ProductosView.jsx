@@ -1,17 +1,19 @@
 import React, { useState, useRef } from "react";
-import { Plus, Trash2, Pencil, ImagePlus, Search, X, Check, Save, FileSpreadsheet } from "lucide-react";
+import { Plus, Trash2, Pencil, ImagePlus, Search, X, Check, Save, FileSpreadsheet, Camera } from "lucide-react";
 import { HelpTag } from "./HelpTag";
 import { ProductThumb, LevelBadge, EmptyState } from "./GaugeBar";
 import { stockLevel, fmtMoney, fmtDate, resizeImage, exportProductsToExcel } from "../utils/helpers";
 import { useData } from "../contexts/DataContext";
 import { useToast } from "./Toast";
+import { CameraScanner } from "./CameraScanner";
 
 const emptyForm = {
   name: "",
   photo: "",
   costPrice: "",
   publicPrice: "",
-  quantity: "",
+  stockLocal: "",
+  stockDeposito: "",
   minStock: 5,
   category: "",
   barcode: "",
@@ -26,6 +28,7 @@ export function ProductosView() {
   const [uploadErr, setUploadErr] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [search, setSearch] = useState("");
+  const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef(null);
 
   const startEdit = (p) => {
@@ -63,7 +66,8 @@ export function ProductosView() {
       photo: form.photo || "",
       costPrice: Number(form.costPrice) || 0,
       publicPrice: Number(form.publicPrice) || 0,
-      quantity: Number(form.quantity) || 0,
+      stockLocal: Number(form.stockLocal) || 0,
+      stockDeposito: Number(form.stockDeposito) || 0,
       minStock: Number(form.minStock) || 0,
       category: form.category ? form.category.trim() : "General",
       barcode: (form.barcode || "").trim(),
@@ -220,13 +224,31 @@ export function ProductosView() {
           />
 
           <label style={labelStyle}>CÓDIGO DE BARRAS (PARA LECTORA)</label>
-          <input
-            value={form.barcode}
-            onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-            placeholder="Ej: 779123456789"
-            className="sc-focus sc-mono"
-            style={inputStyle}
-          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={form.barcode}
+              onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+              placeholder="Ej: 779123456789"
+              className="sc-focus sc-mono"
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowCamera(true)}
+              className="sc-btn sc-focus"
+              style={{
+                background: "var(--panel-alt)",
+                border: "1px solid var(--border)",
+                color: "var(--cyan)",
+                borderRadius: 6,
+                padding: "0 12px",
+                cursor: "pointer",
+              }}
+              title="Escanear con celular"
+            >
+              <Camera size={18} />
+            </button>
+          </div>
 
           <label style={labelStyle}>CATEGORÍA</label>
           <input
@@ -266,11 +288,22 @@ export function ProductosView() {
 
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>STOCK INICIAL</label>
+              <label style={labelStyle}>STOCK LOCAL</label>
               <input
                 type="number"
-                value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+                value={form.stockLocal}
+                onChange={(e) => setForm({ ...form, stockLocal: e.target.value })}
+                placeholder="0"
+                className="sc-focus sc-mono"
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>STOCK DEPÓSITO</label>
+              <input
+                type="number"
+                value={form.stockDeposito}
+                onChange={(e) => setForm({ ...form, stockDeposito: e.target.value })}
                 placeholder="0"
                 className="sc-focus sc-mono"
                 style={inputStyle}
@@ -374,9 +407,16 @@ export function ProductosView() {
                             {p.barcode || "—"}
                           </td>
                           <td style={{ padding: "9px 12px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <span className="sc-mono" style={{ fontSize: 13, fontWeight: 600 }}>{p.quantity}</span>
-                              <LevelBadge level={lvl} />
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5 }}>
+                                <span style={{ color: "var(--text-dim)" }}>Local:</span>
+                                <strong className="sc-mono" style={{ color: "var(--text)" }}>{p.stockLocal}</strong>
+                                <LevelBadge level={stockLevel({ ...p, quantity: p.stockLocal })} />
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5 }}>
+                                <span style={{ color: "var(--text-dim)" }}>Depósito:</span>
+                                <strong className="sc-mono" style={{ color: "var(--text)" }}>{p.stockDeposito}</strong>
+                              </div>
                             </div>
                           </td>
                           <td className="sc-mono" style={{ padding: "9px 12px", fontSize: 12, color: "var(--text-dim)" }}>
@@ -467,6 +507,16 @@ export function ProductosView() {
           )}
         </div>
       </div>
+
+      {showCamera && (
+        <CameraScanner
+          onScan={(code) => {
+            setForm(prev => ({ ...prev, barcode: code }));
+            setShowCamera(false);
+          }}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
     </div>
   );
 }
