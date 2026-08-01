@@ -185,6 +185,36 @@ export async function getTodaySales(userId) {
 }
 
 /**
+ * Get all sales within a date range (for stats computation).
+ */
+export async function getSalesByDateRange(startDate, endDate) {
+  if (!isSupabaseConfigured()) return [];
+
+  const { data, error } = await supabase
+    .from('sales')
+    .select('*')
+    .gte('created_at', startDate.toISOString())
+    .lte('created_at', endDate.toISOString())
+    .order('created_at', { ascending: true });
+
+  if (error) throw new Error(error.message);
+
+  return (data || []).map(s => ({
+    id: s.id,
+    productId: s.product_id,
+    productName: s.product_name,
+    qty: s.qty,
+    unitPrice: Number(s.unit_price) || 0,
+    costPrice: Number(s.cost_price) || 0,
+    paymentMethod: s.payment_method || 'efectivo',
+    paymentDetail: s.payment_detail || '',
+    userId: s.user_id,
+    userName: s.user_name,
+    date: s.created_at,
+  }));
+}
+
+/**
  * Get aggregated stats for a time period.
  */
 export async function getStats(startDate, endDate) {

@@ -14,6 +14,7 @@ export function EstadisticasView() {
   const [period, setPeriod] = useState("mes"); // "dia" | "semana" | "mes" | "anio"
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
+  const [onlineSales, setOnlineSales] = useState([]);
 
   const range = useMemo(() => periodRange(period), [period]);
 
@@ -21,9 +22,14 @@ export function EstadisticasView() {
     if (isOnline) {
       let mounted = true;
       setLoading(true);
-      saleService.getStats(range.start, range.end)
-        .then(data => {
-          if (mounted) setStats(data);
+      Promise.all([
+        saleService.getStats(range.start, range.end),
+        saleService.getSalesByDateRange(range.start, range.end)
+      ]).then(([data, sales]) => {
+          if (mounted) {
+            setStats(data);
+            setOnlineSales(sales);
+          }
         })
         .catch(e => console.error(e))
         .finally(() => {
@@ -33,13 +39,13 @@ export function EstadisticasView() {
     }
   }, [isOnline, range]);
 
-  const localData = useMemo(() => {
-    if (isOnline) return null;
-
-    const periodSales = localSales.filter((s) => {
-      const d = new Date(s.date);
-      return d >= range.start && d <= range.end;
-    });
+  const computedData = useMemo(() => {
+    const periodSales = isOnline 
+      ? onlineSales 
+      : localSales.filter((s) => {
+          const d = new Date(s.date);
+          return d >= range.start && d <= range.end;
+        });
 
     const totalRev = periodSales.reduce((a, s) => a + saleRevenue(s), 0);
     const totalCost = periodSales.reduce((a, s) => a + saleCost(s), 0);
@@ -90,9 +96,11 @@ export function EstadisticasView() {
       timelineData: Object.values(timelineMap),
       topProductsData: Object.values(topMap).sort((a, b) => b.Recaudacion - a.Recaudacion).slice(0, 5)
     };
-  }, [isOnline, localSales, range, period, products]);
+  }, [isOnline, onlineSales, localSales, range, period, products]);
 
-  const displayData = isOnline ? stats : localData;
+  const displayData = isOnline && stats 
+    ? { ...stats, timelineData: computedData.timelineData, topProductsData: computedData.topProductsData }
+    : computedData;
 
   if (loading || (!displayData && isOnline)) {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando estadísticas...</div>;
