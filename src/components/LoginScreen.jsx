@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Boxes, ChevronRight, Loader2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { isNetworkAuthError, probeSupabase } from "../lib/supabase";
 
 export function LoginScreen() {
-  const { handleLogin, handleResetUsers, isOnline } = useAuth();
+  const { handleLogin, handleResetUsers, enterLocalMode, isOnline } = useAuth();
   
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -11,6 +12,19 @@ export function LoginScreen() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [justReset, setJustReset] = useState(false);
+  const [serverDown, setServerDown] = useState(false);
+
+  useEffect(() => {
+    if (!isOnline) return;
+    let cancelled = false;
+    probeSupabase().then((result) => {
+      if (!cancelled && !result.ok && result.reason === "network") {
+        setServerDown(true);
+        setErr("No se pudo conectar con el servidor de cuentas. El proyecto Supabase no responde; no es un error de usuario o contraseña.");
+      }
+    });
+    return () => { cancelled = true; };
+  }, [isOnline]);
 
   const submit = async () => {
     const uInput = username.trim();
@@ -25,6 +39,9 @@ export function LoginScreen() {
     try {
       await handleLogin(uInput, pInput);
     } catch (e) {
+      if (isNetworkAuthError(e) || (e.message && e.message.includes("servidor de cuentas"))) {
+        setServerDown(true);
+      }
       setErr(e.message || "Error al iniciar sesión");
       setLoading(false);
     }
@@ -139,9 +156,31 @@ export function LoginScreen() {
         </label>
 
         {err && (
-          <div style={{ color: "var(--red)", fontSize: 12, marginTop: 12, fontWeight: 500 }}>
+          <div style={{ color: "var(--red)", fontSize: 12, marginTop: 12, fontWeight: 500, lineHeight: 1.45 }}>
             {err}
           </div>
+        )}
+
+        {serverDown && (
+          <button
+            type="button"
+            onClick={() => enterLocalMode()}
+            className="sc-btn sc-focus"
+            style={{
+              marginTop: 12,
+              width: "100%",
+              background: "transparent",
+              color: "var(--text)",
+              border: "1px solid var(--border)",
+              borderRadius: 7,
+              padding: "10px 0",
+              fontWeight: 600,
+              fontSize: 12.5,
+              cursor: "pointer",
+            }}
+          >
+            Entrar en modo local (sin datos de la nube)
+          </button>
         )}
 
         <button type="button" onClick={submit} disabled={loading} className="sc-btn sc-focus" style={{

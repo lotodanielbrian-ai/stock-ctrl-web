@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isNetworkAuthError } from '../lib/supabase';
 import { DEFAULT_DATA } from '../data/initialData';
 import { STORAGE_KEY } from '../utils/helpers';
 
@@ -14,6 +14,7 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [forceOffline, setForceOffline] = useState(false);
   const [isOnline, setIsOnline] = useState(isSupabaseConfigured());
 
   // ---- Supabase Auth Mode ----
@@ -114,43 +115,78 @@ export function AuthProvider({ children }) {
       }
     }
 
-    // Online mode: Supabase Auth
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: emailOrUsername,
-      password,
-    });
-
-    if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        throw new Error('Usuario o contraseña incorrectos.');
-      }
-      throw new Error(error.message);
+    if (forceOffline) {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const data = saved ? JSON.parse(saved) : DEFAULT_DATA;
+      const uInput = emailOrUsername.trim().toLowerCase();
+      const pInput = password.trim().toLowerCase();
+      const user = data.users.find(
+        (x) => x.username.trim().toLowerCase() === uInput && x.password.trim().toLowerCase() === pInput
+      );
+      if (!user) throw new Error('Usuario o contraseña incorrectos.');
+      setCurrentUser({ ...user, assignedLocation: user.assignedLocation || 'local1' });
+      sessionStorage.setItem('stockctrl-current-user', JSON.stringify(user));
+      return user;
     }
 
-    // Profile will be set by onAuthStateChange listener
-    return data.user;
-  }, []);
+    // Online mode: Supabase Auth
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailOrUsername,
+        password,
+      });
+
+      if (error) {
+        if (isNetworkAuthError(error)) {
+          throw new Error('No se pudo conectar con el servidor de cuentas. El proyecto Supabase no responde; no es un error de usuario o contraseña.');
+        }
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Usuario o contraseña incorrectos.');
+        }
+        throw new Error(error.message);
+      }
+
+      // Profile will be set by onAuthStateChange listener
+      return data.user;
+    } catch (e) {
+      if (e.message && e.message.includes('servidor de cuentas')) throw e;
+      if (e.message && e.message.includes('incorrectos')) throw e;
+      if (isNetworkAuthError(e)) {
+        throw new Error('No se pudo conectar con el servidor de cuentas. El proyecto Supabase no responde; no es un error de usuario o contraseña.');
+      }
+      throw e;
+    }
+  }, [forceOffline]);
 
   // ---- Logout ----
   const handleLogout = useCallback(async () => {
-    if (isSupabaseConfigured()) {
+    if (isSupabaseConfigured() && !forceOffline) {
       await supabase.auth.signOut();
-    } else {
-      sessionStorage.removeItem('stockctrl-current-user');
     }
+    sessionStorage.removeItem('stockctrl-current-user');
     setCurrentUser(null);
-  }, []);
+  }, [forceOffline]);
 
   // ---- Reset Demo Users (offline only) ----
+  const enterLocalMode = useCallback(() => {
+    setForceOffline(true);
+    setIsOnline(false);
+    const admin = DEFAULT_DATA.users.find((u) => u.role === 'admin') || DEFAULT_DATA.users[0];
+    const user = { ...admin, assignedLocation: admin.assignedLocation || 'local1' };
+    setCurrentUser(user);
+    sessionStorage.setItem('stockctrl-current-user', JSON.stringify(user));
+    return user;
+  }, []);
+
   const handleResetUsers = useCallback(() => {
-    if (isSupabaseConfigured()) return;
+    if (isSupabaseConfigured() && !forceOffline) return;
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       const data = saved ? JSON.parse(saved) : DEFAULT_DATA;
       data.users = DEFAULT_DATA.users;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) { /* ignore */ }
-  }, []);
+  }, [forceOffline]);
 
   const value = {
     currentUser,
@@ -160,6 +196,8 @@ export function AuthProvider({ children }) {
     handleLogin,
     handleLogout,
     handleResetUsers,
+    enterLocalMode,
+    forceOffline,
     setCurrentUser,
   };
 
