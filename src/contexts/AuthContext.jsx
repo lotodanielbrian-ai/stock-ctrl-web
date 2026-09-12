@@ -186,7 +186,7 @@ export function AuthProvider({ children }) {
       data.users = DEFAULT_DATA.users;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) { /* ignore */ }
-  }, []);
+  }, [forceOffline]);
 
   const value = {
     currentUser,
