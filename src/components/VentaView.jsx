@@ -5,7 +5,7 @@ import { useData } from "../contexts/DataContext";
 import { useToast } from "./Toast";
 import { uid } from "../utils/helpers";
 import { getPaymentInfo } from "../utils/paymentMethods";
-import { INVOICE_TYPES, stockFieldForLocation, ticketTotals } from "../utils/caja";
+import { INVOICE_TYPES, foldText, stockFieldForLocation, ticketTotals } from "../utils/caja";
 import { printBrowserTicket, printThermal, getPrinterPrefs, isSerialConnected } from "../services/printerService";
 import { requestAfipInvoice } from "../services/fiscalService";
 import { CajaHeader } from "./caja/CajaHeader";
@@ -85,10 +85,10 @@ export function VentaView() {
       : "";
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = foldText(search.trim());
     if (!q) return [];
     return products.filter((p) =>
-      p.name.toLowerCase().includes(q) || (p.barcode && p.barcode.toLowerCase().includes(q))
+      foldText(p.name).includes(q) || foldText(p.barcode).includes(q)
     ).slice(0, 12);
   }, [products, search]);
 

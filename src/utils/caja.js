@@ -112,3 +112,10 @@ export const DEFAULT_FISCAL = {
 export function formatRegisterNumber(n) {
   return String(n || "01").padStart(2, "0");
 }
+
+export function foldText(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
