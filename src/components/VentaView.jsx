@@ -70,6 +70,7 @@ export function VentaView() {
   const searchRef = useRef(null);
   const confirmRef = useRef(null);
   const lastTicketRef = useRef(null);
+  const printTicketRef = useRef(null);
 
   const totals = useMemo(() => ticketTotals(lines), [lines]);
   const cashNum = cashReceived === "" ? null : Number(cashReceived);
@@ -171,6 +172,8 @@ export function VentaView() {
     printBrowserTicket();
   };
 
+  printTicketRef.current = printTicket;
+
   const confirmPayment = async () => {
     if (!canCharge) {
       if (chargeHint) addToast(chargeHint, "error");
@@ -251,7 +254,7 @@ export function VentaView() {
       if (e.key === "F1") { e.preventDefault(); barcodeRef.current?.focus(); }
       if (e.key === "F2") { e.preventDefault(); qtyRef.current?.focus(); qtyRef.current?.select(); }
       if (e.key === "F3") { e.preventDefault(); searchRef.current?.focus(); setShowSearch(true); }
-      if (e.key === "F4") { e.preventDefault(); if (lastTicketRef.current) printTicket(lastTicketRef.current); }
+      if (e.key === "F4") { e.preventDefault(); if (lastTicketRef.current) printTicketRef.current?.(lastTicketRef.current); }
       if (e.key === "F8") { e.preventDefault(); if (sessionOpen) setShowClose(true); }
       if (e.key === "F9") { e.preventDefault(); confirmRef.current?.(); }
       if (e.key === "Delete" && selectedId && document.activeElement?.tagName !== "INPUT") {
@@ -269,7 +272,7 @@ export function VentaView() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [sessionOpen, selectedId, register, fiscalSettings]);
+  }, [sessionOpen, selectedId]);
 
   useEffect(() => {
     if (sessionOpen) focusBarcode();

@@ -9,7 +9,7 @@ const GS = 0x1d;
 const TRANSLIT = {
   Á: "A", É: "E", Í: "I", Ó: "O", Ú: "U", Ü: "U", Ñ: "N",
   á: "a", é: "e", í: "i", ó: "o", ú: "u", ü: "u", ñ: "n",
-  ¿: "?", ¡: "!", º: "o", ª: "a",
+  "?": "?", "!": "!",
 };
 
 function encodeText(str) {
