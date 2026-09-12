@@ -4,7 +4,7 @@ import { HelpTag } from "./HelpTag";
 import { useData } from "../contexts/DataContext";
 import { useToast } from "./Toast";
 import { fmtDate, fmtMoney, uid } from "../utils/helpers";
-import { DEFAULT_FISCAL, LOCATIONS, formatRegisterNumber, locationLabel, registerLabel } from "../utils/caja";
+import { DEFAULT_FISCAL, LOCATIONS, expectedCash, formatRegisterNumber, locationLabel, registerLabel } from "../utils/caja";
 import {
   connectSerialPrinter,
   disconnectSerialPrinter,
@@ -19,7 +19,7 @@ const emptyReg = { id: "", number: "04", name: "CAJA", location: "local1", isAct
 
 export function CajasView() {
   const {
-    cashRegisters, cashSessions, fiscalSettings, cajaSynced,
+    cashRegisters, cashSessions, cashMovements, fiscalSettings, cajaSynced,
     handleSaveRegister, handleDeleteRegister, handleSaveFiscal,
   } = useData();
   const { addToast } = useToast();
@@ -176,6 +176,7 @@ export function CajasView() {
             <tbody>
               {sessions.slice(0, 20).map((s) => {
                 const reg = cashRegisters.find((r) => r.id === s.registerId);
+                const esperado = s.status === "open" ? expectedCash(s, cashMovements) : s.expectedCash;
                 return (
                   <tr key={s.id}>
                     <td>{reg ? registerLabel(reg) : "—"}</td>
@@ -183,7 +184,7 @@ export function CajasView() {
                     <td className="sc-mono">{fmtDate(s.openedAt)}</td>
                     <td className="sc-mono">{s.closedAt ? fmtDate(s.closedAt) : "Abierta"}</td>
                     <td className="sc-mono">${fmtMoney(s.openingFloat)}</td>
-                    <td className="sc-mono">${fmtMoney(s.expectedCash)}</td>
+                    <td className="sc-mono">${fmtMoney(esperado)}</td>
                     <td className="sc-mono">{s.countedCash == null ? "—" : `$${fmtMoney(s.countedCash)}`}</td>
                     <td className="sc-mono">{s.difference == null ? "—" : `$${fmtMoney(s.difference)}`}</td>
                   </tr>
