@@ -24,3 +24,23 @@ export const supabase = supabaseUrl && supabaseAnonKey
   : null;
 
 export const isSupabaseConfigured = () => !!supabase;
+
+export function isNetworkAuthError(err) {
+  const msg = String(err?.message || err || "");
+  return /failed to fetch|networkerror|network request failed|load failed|err_name_not_resolved|err_connection|name_not_resolved/i.test(msg);
+}
+
+export async function probeSupabase() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { ok: false, reason: "unconfigured" };
+  }
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/health`, {
+      method: "GET",
+      headers: { apikey: supabaseAnonKey },
+    });
+    return { ok: res.ok, status: res.status, reason: res.ok ? "ok" : "http" };
+  } catch (e) {
+    return { ok: false, reason: "network", message: e.message };
+  }
+}

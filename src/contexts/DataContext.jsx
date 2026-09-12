@@ -28,8 +28,8 @@ function seedProducts(list) {
 }
 
 export function DataProvider({ children }) {
-  const { currentUser } = useAuth();
-  const online = isSupabaseConfigured();
+  const { currentUser, forceOffline } = useAuth();
+  const online = isSupabaseConfigured() && !forceOffline;
 
   const [products, setProducts] = useState([]);
   const [sales, setSales] = useState([]);
