@@ -47,6 +47,7 @@ export function AuthProvider({ children }) {
               role: profile.role,
               salary: Number(profile.salary) || 0,
               commissionRate: Number(profile.commission_rate) || 0,
+              assignedLocation: profile.assigned_location || 'local1',
               email: session.user.email,
             });
           }
@@ -80,6 +81,7 @@ export function AuthProvider({ children }) {
               role: profile.role,
               salary: Number(profile.salary) || 0,
               commissionRate: Number(profile.commission_rate) || 0,
+              assignedLocation: profile.assigned_location || 'local1',
               email: session.user.email,
             });
           }

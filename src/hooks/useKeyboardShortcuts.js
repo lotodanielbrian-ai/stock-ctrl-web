@@ -13,8 +13,8 @@ export function useKeyboardShortcuts(shortcuts, active = true) {
     const handleKeyDown = (e) => {
       // Don't trigger shortcuts if user is typing in an input or textarea
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
-        // Allow Escape to work even in inputs (e.g. to close modals)
-        if (e.key.toLowerCase() !== 'escape') {
+        // Allow Escape and function keys even in inputs (POS: F1 barcode, F9 charge)
+        if (e.key.toLowerCase() !== 'escape' && !/^f\d+$/i.test(e.key)) {
           return;
         }
       }

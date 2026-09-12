@@ -1,8 +1,8 @@
 export const DEFAULT_DATA = {
   users: [
-    { id: "admin", username: "admin", password: "admin123", role: "admin", name: "Administrador General", salary: 250000, commissionRate: 0 },
-    { id: "v1", username: "vendedor1", password: "venta123", role: "vendedor", name: "Lucas Gómez", salary: 180000, commissionRate: 2.5 },
-    { id: "v2", username: "vendedor2", password: "venta123", role: "vendedor", name: "Sofía Martínez", salary: 175000, commissionRate: 2.5 },
+    { id: "admin", username: "admin", password: "admin123", role: "admin", name: "Administrador General", salary: 250000, commissionRate: 0, assignedLocation: "local1" },
+    { id: "v1", username: "vendedor1", password: "venta123", role: "vendedor", name: "Lucas Gómez", salary: 180000, commissionRate: 2.5, assignedLocation: "local1" },
+    { id: "v2", username: "vendedor2", password: "venta123", role: "vendedor", name: "Sofía Martínez", salary: 175000, commissionRate: 2.5, assignedLocation: "local2" },
   ],
   products: [
     {
