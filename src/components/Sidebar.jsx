@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Package, AlertTriangle, ShoppingCart, ClipboardList, Users, LogOut,
-  ChevronsLeft, ChevronsRight, BarChart3, Wallet, Boxes, Palette
+  ChevronsLeft, ChevronsRight, BarChart3, Wallet, Boxes, Palette, Banknote
 } from "lucide-react";
 
 export const NAV_ITEMS = [
@@ -12,6 +12,7 @@ export const NAV_ITEMS = [
   { key: "historial", label: "Historial", icon: ClipboardList, roles: ["admin", "vendedor"] },
   { key: "estadisticas", label: "Estadísticas", icon: BarChart3, roles: ["admin"] },
   { key: "nomina", label: "Nómina", icon: Wallet, roles: ["admin"] },
+  { key: "cajas", label: "Cajas", icon: Banknote, roles: ["admin"] },
   { key: "usuarios", label: "Usuarios", icon: Users, roles: ["admin"] },
 ];
 

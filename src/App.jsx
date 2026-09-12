@@ -16,6 +16,7 @@ const HistorialView = lazy(() => import('./components/HistorialView').then(m => 
 const EstadisticasView = lazy(() => import('./components/EstadisticasView').then(m => ({ default: m.EstadisticasView })));
 const NominaView = lazy(() => import('./components/NominaView').then(m => ({ default: m.NominaView })));
 const UsuariosView = lazy(() => import('./components/UsuariosView').then(m => ({ default: m.UsuariosView })));
+const CajasView = lazy(() => import('./components/CajasView').then(m => ({ default: m.CajasView })));
 
 import { SkeletonPage } from './components/Skeleton';
 
@@ -88,7 +89,14 @@ function MainApp() {
           </div>
         </Suspense>
 
-        <main style={{ flex: 1, padding: '24px 28px', maxWidth: 1280, margin: '0 auto', width: '100%', overflowX: 'hidden' }}>
+        <main style={{
+          flex: 1,
+          padding: view === 'venta' ? '12px 16px' : '24px 28px',
+          maxWidth: view === 'venta' ? 'none' : 1280,
+          margin: view === 'venta' ? 0 : '0 auto',
+          width: '100%',
+          overflowX: 'hidden',
+        }}>
           {/* Mobile Header Toggle */}
           <div className="sc-hide-desktop" style={{ display: 'none', marginBottom: 20 }}>
             <button onClick={() => setSidebarOpen(true)} className="sc-btn" style={{ background: 'var(--panel)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 6, color: 'var(--text)' }}>
@@ -104,6 +112,7 @@ function MainApp() {
             {view === 'historial' && <HistorialView />}
             {view === 'estadisticas' && isAdmin && <EstadisticasView />}
             {view === 'nomina' && isAdmin && <NominaView />}
+            {view === 'cajas' && isAdmin && <CajasView />}
             {view === 'usuarios' && isAdmin && <UsuariosView />}
           </Suspense>
         </main>

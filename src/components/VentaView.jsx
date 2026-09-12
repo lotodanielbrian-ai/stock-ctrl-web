@@ -1,547 +1,439 @@
-import React, { useState, useEffect, useRef } from "react";
-import { ShoppingCart, Search, X, Ban, CheckCircle2, Camera, Trash2 } from "lucide-react";
-import { HelpTag } from "./HelpTag";
-import { ProductThumb, LevelBadge, EmptyState } from "./GaugeBar";
-import { stockLevel, fmtMoney, saleRevenue, uid } from "../utils/helpers";
-import { useData } from "../contexts/DataContext";
-import { useAuth } from "../contexts/AuthContext";
-import { useToast } from "./Toast";
-import { PaymentSelector } from "./PaymentSelector";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CameraScanner } from "./CameraScanner";
+import { useAuth } from "../contexts/AuthContext";
+import { useData } from "../contexts/DataContext";
+import { useToast } from "./Toast";
+import { uid } from "../utils/helpers";
+import { getPaymentInfo } from "../utils/paymentMethods";
+import { INVOICE_TYPES, stockFieldForLocation, ticketTotals } from "../utils/caja";
+import { printBrowserTicket, printThermal, getPrinterPrefs, isSerialConnected } from "../services/printerService";
+import { requestAfipInvoice } from "../services/fiscalService";
+import { CajaHeader } from "./caja/CajaHeader";
+import { BarcodeBar } from "./caja/BarcodeBar";
+import { TicketGrid } from "./caja/TicketGrid";
+import { CheckoutPanel } from "./caja/CheckoutPanel";
+import { OpenSessionModal } from "./caja/OpenSessionModal";
+import { CloseSessionModal } from "./caja/CloseSessionModal";
+import { CashMoveModal } from "./caja/CashMoveModal";
+import { TicketReceipt } from "./caja/TicketReceipt";
 
-function ScanBarcodeIcon() {
-  return (
-    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" style={{ margin: "0 auto" }}>
-      <rect x="2" y="4" width="2" height="16" fill="var(--cyan)" />
-      <rect x="6" y="4" width="1" height="16" fill="var(--text-dim)" />
-      <rect x="9" y="4" width="2" height="16" fill="var(--cyan)" />
-      <rect x="13" y="4" width="1" height="16" fill="var(--text-dim)" />
-      <rect x="15" y="4" width="2" height="16" fill="var(--cyan)" />
-      <rect x="19" y="4" width="1" height="16" fill="var(--text-dim)" />
-      <rect x="21" y="4" width="2" height="16" fill="var(--cyan)" />
-    </svg>
-  );
-}
+const REGISTER_KEY = "sc-active-register";
 
 export function VentaView() {
-  const { products, sales, handleSell, handleUndoSale, handleUpdatePaymentMethod } = useData();
+  const { products, cashRegisters, cashSessions, cashMovements, fiscalSettings, handleRegisterTicket, handleOpenSession, handleCloseSession, handleAddMovement } = useData();
   const { currentUser, isAdmin } = useAuth();
   const { addToast } = useToast();
 
-  const [mode, setMode] = useState("escaner"); // "escaner" | "manual"
-  const [productId, setProductId] = useState("");
-  const [qty, setQty] = useState(1);
-  const [search, setSearch] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("efectivo");
-  const [isSelling, setIsSelling] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
-  
-  // NEW: Supermarket-style purchase list
-  const [purchaseList, setPurchaseList] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const location = currentUser.assignedLocation || "local1";
+  const visibleRegisters = useMemo(() => {
+    const active = (cashRegisters || []).filter((r) => r.isActive);
+    if (isAdmin) return active;
+    return active.filter((r) => r.location === location);
+  }, [cashRegisters, isAdmin, location]);
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.barcode && p.barcode.includes(search))
-  );
+  const [registerId, setRegisterId] = useState(() => localStorage.getItem(REGISTER_KEY) || "");
+  const register = visibleRegisters.find((r) => r.id === registerId) || visibleRegisters[0] || null;
+  const session = cashSessions.find((s) => s.registerId === register?.id && s.status === "open") || null;
+  const sessionOpen = session?.status === "open";
 
-  const selected = products.find((p) => p.id === productId);
-
-  // Helper to add to purchase list and deduct stock immediately
-  const addToPurchaseList = async (product, addQty) => {
-    setIsSelling(true);
-    try {
-      // By default register with 'efectivo', we'll update it later when they confirm the total
-      const result = await handleSell(product.id, addQty, currentUser, currentUser.assignedLocation, "efectivo", "");
-      
-      const saleId = result?.sale_id || result?.id; // depending on online/offline response
-      
-      setPurchaseList(prev => [...prev, {
-        tempId: uid(),
-        product,
-        qty: addQty,
-        price: product.publicPrice,
-        saleId
-      }]);
-      
-      addToast(`Agregado: ${addQty} × ${product.name} — $${fmtMoney(product.publicPrice * addQty)}`, "success");
-    } catch (e) {
-      addToast(e.message, "error");
-    } finally {
-      setIsSelling(false);
-    }
-  };
-
-  const submitManual = async () => {
-    if (!selected) {
-      addToast("Elegí un producto de la lista.", "error");
-      return;
-    }
-    const q = Number(qty);
-    if (!q || q <= 0) {
-      addToast("Ingresá una cantidad válida mayor a 0.", "error");
-      return;
-    }
-    
-    await addToPurchaseList(selected, q);
-    setQty(1);
-    setProductId("");
-    setSearch("");
-  };
-
-  /* Scanner Mode */
-  const scanRef = useRef(null);
-  const [scanValue, setScanValue] = useState("");
+  const [nowLabel, setNowLabel] = useState(() => new Date().toLocaleString("es-AR"));
+  useEffect(() => {
+    const t = setInterval(() => setNowLabel(new Date().toLocaleString("es-AR")), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
-    if (mode === "escaner" && scanRef.current) {
-      scanRef.current.focus();
+    if (register?.id) localStorage.setItem(REGISTER_KEY, register.id);
+  }, [register?.id]);
+
+  const [lines, setLines] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [scanValue, setScanValue] = useState("");
+  const [qty, setQty] = useState(1);
+  const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("efectivo");
+  const [cashReceived, setCashReceived] = useState("");
+  const [invoiceType, setInvoiceType] = useState("ticket");
+  const [customerName, setCustomerName] = useState("");
+  const [customerDocType, setCustomerDocType] = useState("DNI");
+  const [customerDoc, setCustomerDoc] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [showOpen, setShowOpen] = useState(false);
+  const [showClose, setShowClose] = useState(false);
+  const [showMove, setShowMove] = useState(false);
+  const [lastTicket, setLastTicket] = useState(null);
+
+  const barcodeRef = useRef(null);
+  const qtyRef = useRef(null);
+  const searchRef = useRef(null);
+  const confirmRef = useRef(null);
+  const lastTicketRef = useRef(null);
+
+  const totals = useMemo(() => ticketTotals(lines), [lines]);
+  const cashNum = cashReceived === "" ? null : Number(cashReceived);
+  const change = (cashNum == null ? 0 : cashNum) - totals.total;
+  const cashOk = paymentMethod !== "efectivo" || cashNum == null || cashNum >= totals.total;
+  const canCharge = sessionOpen && lines.length > 0 && !processing && cashOk;
+
+  const chargeHint = !sessionOpen
+    ? "Abrí la caja para cobrar"
+    : paymentMethod === "efectivo" && cashNum != null && cashNum < totals.total
+      ? "El efectivo no cubre el total"
+      : "";
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return products.filter((p) =>
+      p.name.toLowerCase().includes(q) || (p.barcode && p.barcode.toLowerCase().includes(q))
+    ).slice(0, 12);
+  }, [products, search]);
+
+  const focusBarcode = () => setTimeout(() => barcodeRef.current?.focus(), 40);
+
+  const addProduct = (product, addQty) => {
+    if (!sessionOpen) {
+      addToast("Abrí la caja antes de cargar productos.", "error");
+      return;
     }
-  }, [mode]);
+    const q = Math.max(1, Number(addQty) || 1);
+    const field = stockFieldForLocation(location);
+    const available = Number(product[field]) || 0;
+    const already = lines.filter((l) => l.productId === product.id).reduce((a, l) => a + Number(l.qty), 0);
+    if (available < already + q && !isAdmin) {
+      addToast(`Stock insuficiente de ${product.name}. Disponible: ${available}`, "error");
+      return;
+    }
 
-  const handleScanKeyDown = async (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    if (isSelling) return;
-
-    const code = scanValue.trim();
+    setLines((prev) => {
+      const existing = prev.find((l) => l.productId === product.id);
+      if (existing) {
+        return prev.map((l) => l.tempId === existing.tempId ? { ...l, qty: Number(l.qty) + q } : l);
+      }
+      return [...prev, {
+        tempId: uid(),
+        productId: product.id,
+        product,
+        qty: q,
+        listPrice: Number(product.publicPrice) || 0,
+        discountType: "amount",
+        discountValue: 0,
+      }];
+    });
+    setQty(1);
     setScanValue("");
-    if (!code) return;
+    setSearch("");
+    setShowSearch(false);
+    focusBarcode();
+  };
 
+  const handleScanSubmit = () => {
+    const code = scanValue.trim();
+    if (!code) return;
     const product = products.find((p) => p.barcode && p.barcode.trim() === code);
     if (!product) {
       addToast(`Código no reconocido: ${code}`, "error");
+      setScanValue("");
       return;
     }
-    
-    await addToPurchaseList(product, 1);
+    addProduct(product, qty);
   };
 
-  const handleCameraScan = async (code) => {
+  const handleCameraScan = (code) => {
     setShowCamera(false);
     if (!code) return;
-    
     const product = products.find((p) => p.barcode && p.barcode.trim() === code);
     if (!product) {
       addToast(`Código no reconocido: ${code}`, "error");
       return;
     }
-    
-    await addToPurchaseList(product, 1);
+    addProduct(product, qty);
   };
 
-  const removeFromList = async (tempId) => {
-    const item = purchaseList.find(i => i.tempId === tempId);
-    if (!item) return;
-
-    setIsProcessing(true);
-    try {
-      await handleUndoSale(item.saleId, item.product.id, item.qty, currentUser.assignedLocation);
-      setPurchaseList(prev => prev.filter(i => i.tempId !== tempId));
-      addToast(`Devuelto: ${item.product.name} — stock restaurado`, "success");
-    } catch (e) {
-      addToast(`Error al devolver: ${e.message}`, "error");
-    } finally {
-      setIsProcessing(false);
+  const printTicket = async (ticket) => {
+    if (!ticket) return;
+    const prefs = getPrinterPrefs();
+    if (prefs.mode === "serial" && isSerialConnected()) {
+      try {
+        await printThermal(ticket, {
+          register,
+          fiscal: fiscalSettings,
+          openDrawer: ticket.paymentMethod === "efectivo",
+        });
+        addToast("Ticket enviado a la térmica", "success");
+        return;
+      } catch (e) {
+        addToast(`Térmica: ${e.message}. Imprimiendo en el navegador.`, "error");
+      }
     }
+    printBrowserTicket();
   };
 
   const confirmPayment = async () => {
-    if (purchaseList.length === 0) return;
-    
-    setIsProcessing(true);
+    if (!canCharge) {
+      if (chargeHint) addToast(chargeHint, "error");
+      return;
+    }
+    setProcessing(true);
     try {
-      const saleIds = purchaseList.map(i => i.saleId);
-      await handleUpdatePaymentMethod(saleIds, paymentMethod);
-      addToast(`Cobro confirmado: $${fmtMoney(purchaseTotal)}`, "success");
-      setPurchaseList([]);
-      setPaymentMethod("efectivo");
+      let fiscal = { fiscalStatus: "none", cae: "", caeVto: "", invoiceNumber: "" };
+      const typeInfo = INVOICE_TYPES[invoiceType];
+      if (typeInfo?.fiscal) {
+        const afip = await requestAfipInvoice({
+          invoiceType,
+          total: totals.total,
+          customerName,
+          customerDocType,
+          customerDoc,
+          puntoVenta: register?.afipPuntoVenta,
+          fiscalSettings,
+        });
+        if (afip.ok && afip.cae) {
+          fiscal = { fiscalStatus: "issued", cae: afip.cae, caeVto: afip.caeVto || "", invoiceNumber: afip.invoiceNumber || "" };
+        } else {
+          fiscal = { fiscalStatus: "error" };
+          addToast(afip.message || "AFIP no emitió CAE. Se guarda como no fiscal.", "error");
+        }
+      }
+
+      const received = paymentMethod === "efectivo"
+        ? (cashNum == null ? totals.total : cashNum)
+        : 0;
+      const given = paymentMethod === "efectivo" ? Math.max(0, received - totals.total) : 0;
+
+      const ticket = await handleRegisterTicket({
+        lines,
+        paymentMethod,
+        paymentDetail: "",
+        registerId: register.id,
+        sessionId: session.id,
+        cashReceived: received,
+        changeGiven: given,
+        invoiceType,
+        customerName,
+        customerDocType,
+        customerDoc,
+        fiscal,
+        user: currentUser,
+        location,
+      });
+
+      const decorated = {
+        ...ticket,
+        paymentLabel: getPaymentInfo(paymentMethod).label,
+        cashReceived: received,
+        changeGiven: given,
+      };
+      setLastTicket(decorated);
+      setLines([]);
+      setSelectedId(null);
+      setCashReceived("");
+      setInvoiceType("ticket");
+      setCustomerName("");
+      setCustomerDoc("");
+      addToast(`Cobro confirmado: $${totals.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`, "success");
+      setTimeout(() => printTicket(decorated), 80);
+      focusBarcode();
     } catch (e) {
-      addToast(`Error al confirmar pago: ${e.message}`, "error");
+      addToast(e.message || "No se pudo cobrar", "error");
     } finally {
-      setIsProcessing(false);
+      setProcessing(false);
     }
   };
 
-  const inputStyle = {
-    width: "100%",
-    background: "var(--panel-alt)",
-    border: "1px solid var(--border)",
-    borderRadius: 6,
-    padding: "9px 11px",
-    color: "var(--text)",
-    fontSize: 13.5,
-  };
+  confirmRef.current = confirmPayment;
+  lastTicketRef.current = lastTicket;
 
-  const purchaseTotal = purchaseList.reduce((acc, item) => acc + (item.price * item.qty), 0);
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "F1") { e.preventDefault(); barcodeRef.current?.focus(); }
+      if (e.key === "F2") { e.preventDefault(); qtyRef.current?.focus(); qtyRef.current?.select(); }
+      if (e.key === "F3") { e.preventDefault(); searchRef.current?.focus(); setShowSearch(true); }
+      if (e.key === "F4") { e.preventDefault(); if (lastTicketRef.current) printTicket(lastTicketRef.current); }
+      if (e.key === "F8") { e.preventDefault(); if (sessionOpen) setShowClose(true); }
+      if (e.key === "F9") { e.preventDefault(); confirmRef.current?.(); }
+      if (e.key === "Delete" && selectedId && document.activeElement?.tagName !== "INPUT") {
+        e.preventDefault();
+        setLines((prev) => prev.filter((l) => l.tempId !== selectedId));
+        setSelectedId(null);
+      }
+      if (e.key === "Escape") {
+        setScanValue("");
+        setSearch("");
+        setShowSearch(false);
+        setShowCamera(false);
+        focusBarcode();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sessionOpen, selectedId, register, fiscalSettings]);
+
+  useEffect(() => {
+    if (sessionOpen) focusBarcode();
+  }, [sessionOpen]);
 
   return (
-    <div className="sc-fadein" style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
-      
-      {/* PANEL IZQUIERDO: Escáner y búsqueda */}
-      <div style={{ flex: "1 1 400px", maxWidth: 600 }}>
-        <div className="sc-display" style={{ fontSize: 17, fontWeight: 600, marginBottom: 4 }}>
-          Caja — Registrar productos
-          <HelpTag text="Al escanear, el stock se descuenta y se agrega a la lista. Podés deshacer cualquier ítem desde la lista." />
-        </div>
-        <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 16 }}>
-          Cajero: <strong style={{ color: "var(--cyan)" }}>{currentUser.name}</strong> en <strong style={{ color: "var(--green)" }}>{currentUser.assignedLocation === 'local2' ? 'Local 2' : (currentUser.assignedLocation === 'deposito' ? 'Depósito' : 'Local 1')}</strong>
-        </p>
+    <div className="caja-pos sc-fadein">
+      <TicketReceipt ticket={lastTicket} register={register} fiscal={fiscalSettings} cashierName={currentUser.name} />
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-          {[
-            { k: "escaner", l: "Escáner" },
-            { k: "manual", l: "Búsqueda manual" },
-          ].map((t) => (
-            <button
-              key={t.k}
-              onClick={() => { setMode(t.k); }}
-              className="sc-btn sc-focus"
-              style={{
-                padding: "7px 16px",
-                borderRadius: 999,
-                fontSize: 12.5,
-                cursor: "pointer",
-                border: `1px solid ${mode === t.k ? "var(--cyan)" : "var(--border)"}`,
-                background: mode === t.k ? "#45D9C71A" : "transparent",
-                color: mode === t.k ? "var(--cyan)" : "var(--text-dim)",
-                fontWeight: 600,
-              }}
-            >
-              {t.l}
-            </button>
-          ))}
-        </div>
+      <CajaHeader
+        register={register}
+        registers={visibleRegisters}
+        session={session}
+        cashierName={currentUser.name}
+        location={location}
+        nowLabel={nowLabel}
+        onSelectRegister={(id) => setRegisterId(id)}
+        onOpen={() => setShowOpen(true)}
+        onClose={() => setShowClose(true)}
+        onMove={() => setShowMove(true)}
+        disabledSelect={lines.length > 0}
+      />
 
-        {products.length === 0 ? (
-          <EmptyState text="No hay productos cargados todavía." />
-        ) : (
-          <>
-            {mode === "escaner" ? (
-              <div
-                onClick={() => scanRef.current && scanRef.current.focus()}
-                style={{
-                  background: "var(--panel)",
-                  border: "2px solid var(--border)",
-                  borderRadius: 10,
-                  padding: 24,
-                  textAlign: "center",
-                  cursor: "text",
-                  transition: "border-color .15s ease",
-                  boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
-                  marginBottom: 16,
-                  opacity: isSelling || isProcessing ? 0.6 : 1,
-                  position: "relative",
-                }}
+      <BarcodeBar
+        barcodeRef={barcodeRef}
+        qtyRef={qtyRef}
+        searchRef={searchRef}
+        scanValue={scanValue}
+        setScanValue={setScanValue}
+        onScanSubmit={handleScanSubmit}
+        qty={qty}
+        setQty={setQty}
+        search={search}
+        setSearch={(v) => { setSearch(v); setShowSearch(true); }}
+        onSearchFocus={() => setShowSearch(true)}
+        onOpenCamera={() => setShowCamera(true)}
+        disabled={!sessionOpen || processing}
+      />
+
+      {showSearch && search && (
+        <div className="caja-search-results">
+          {filtered.length === 0 && <div className="caja-hint">Sin resultados</div>}
+          {filtered.map((p) => {
+            const available = Number(p[stockFieldForLocation(location)]) || 0;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className="caja-search-item"
+                disabled={available <= 0 && !isAdmin}
+                onClick={() => addProduct(p, qty)}
               >
-                <ScanBarcodeIcon />
-                <div style={{ fontSize: 13, color: "var(--text-dim)", margin: "12px 0 14px" }}>
-                  Apuntá con el lector al código del producto
-                </div>
-                <input
-                  ref={scanRef}
-                  value={scanValue}
-                  onChange={(e) => setScanValue(e.target.value)}
-                  onKeyDown={handleScanKeyDown}
-                  onBlur={() => setTimeout(() => scanRef.current && scanRef.current.focus(), 80)}
-                  className="sc-focus sc-mono"
-                  style={{ ...inputStyle, textAlign: "center", fontSize: 17, letterSpacing: "0.08em", maxWidth: 380, margin: "0 auto" }}
-                  placeholder="Esperando escaneo..."
-                  autoFocus
-                  disabled={isSelling || isProcessing}
-                />
-
-                <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px dashed var(--border-soft)" }}>
-                  <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 10 }}>¿No tienes lector óptico?</div>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setShowCamera(true); }}
-                    className="sc-btn sc-focus"
-                    style={{
-                      background: "var(--cyan)",
-                      color: "#000",
-                      padding: "10px 20px",
-                      fontWeight: 600,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <Camera size={18} />
-                    Escanear con Celular
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{
-                background: "var(--panel)",
-                border: "1px solid var(--border)",
-                borderRadius: 9,
-                padding: 20,
-                boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-              }}>
-                <label style={{ fontSize: 11, color: "var(--text-dim)", display: "block", marginBottom: 6, fontWeight: 600 }}>
-                  BUSCAR PRODUCTO
-                </label>
-                <div style={{ position: "relative", marginBottom: 12 }}>
-                  <Search size={14} color="var(--text-faint)" style={{ position: "absolute", left: 10, top: 11 }} />
-                  <input
-                    value={selected ? selected.name : search}
-                    onChange={(e) => { setSearch(e.target.value); setProductId(""); }}
-                    placeholder="Escribí para buscar..."
-                    className="sc-focus"
-                    style={{ ...inputStyle, paddingLeft: 32 }}
-                  />
-                </div>
-
-                {!selected && search && (
-                  <div style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: 7,
-                    maxHeight: 220,
-                    overflowY: "auto",
-                    marginBottom: 14,
-                    marginTop: -6,
-                    background: "var(--panel-alt)",
-                  }}>
-                    {filtered.length === 0 && (
-                      <div style={{ padding: 12, fontSize: 12.5, color: "var(--text-faint)" }}>No se encontraron productos.</div>
-                    )}
-                    {filtered.map((p) => {
-                      const stockField = currentUser.assignedLocation === 'local2' ? 'stockLocal2' : (currentUser.assignedLocation === 'deposito' ? 'stockDeposito' : 'stockLocal1');
-                      const availableStock = Number(p[stockField]) || 0;
-                      const outOfStock = availableStock <= 0;
-                      const disabled = outOfStock && !isAdmin;
-                      return (
-                        <div
-                          key={p.id}
-                          onClick={() => { if (disabled) return; setProductId(p.id); setSearch(""); }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            padding: "9px 12px",
-                            cursor: disabled ? "not-allowed" : "pointer",
-                            borderBottom: "1px solid var(--border-soft)",
-                            opacity: disabled ? 0.45 : 1,
-                            transition: "background .12s ease",
-                          }}
-                          onMouseDown={(e) => e.preventDefault()}
-                        >
-                          <ProductThumb product={p} size={28} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
-                            <div className="sc-mono" style={{ fontSize: 11, color: "var(--text-faint)" }}>
-                              {disabled ? "Sin stock disponible" : `Stock: ${availableStock} · $${fmtMoney(p.publicPrice)}`}
-                            </div>
-                          </div>
-                          {disabled ? <Ban size={14} color="var(--red)" /> : <LevelBadge level={stockLevel({ ...p, quantity: availableStock })} />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {selected && (
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    background: "var(--panel-alt)",
-                    border: "1px solid var(--cyan)55",
-                    borderRadius: 7,
-                    padding: 12,
-                    marginBottom: 16,
-                  }}>
-                    <ProductThumb product={selected} size={40} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.name}</div>
-                      <div className="sc-mono" style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>
-                        Precio: <strong style={{ color: "var(--green)" }}>${fmtMoney(selected.publicPrice)}</strong>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => setProductId("")} className="sc-btn" style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-faint)",
-                      cursor: "pointer",
-                      padding: 4,
-                    }}>
-                      <X size={16} />
-                    </button>
-                  </div>
-                )}
-
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 11, color: "var(--text-dim)", display: "block", marginBottom: 6, fontWeight: 600 }}>
-                    CANTIDAD
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={qty}
-                    onChange={(e) => setQty(e.target.value)}
-                    className="sc-focus"
-                    style={{ ...inputStyle, width: 100 }}
-                  />
-                </div>
-
-                <button type="button" onClick={submitManual} disabled={isSelling || isProcessing} className="sc-btn" style={{
-                  marginTop: 8,
-                  width: "100%",
-                  background: "var(--cyan)",
-                  color: "#0A1210",
-                  border: "none",
-                  borderRadius: 7,
-                  padding: "12px 20px",
-                  fontWeight: 600,
-                  fontSize: 13.5,
-                  cursor: isSelling || isProcessing ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  opacity: isSelling || isProcessing ? 0.7 : 1,
-                }}>
-                  <ShoppingCart size={18} />
-                  Agregar a la lista
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* PANEL DERECHO: Lista de Compra */}
-      <div style={{ flex: "1 1 350px", display: "flex", flexDirection: "column", height: "calc(100vh - 140px)", minHeight: 500, position: "sticky", top: 20 }}>
-        <div style={{
-          background: "var(--panel)",
-          border: "1px solid var(--border)",
-          borderRadius: 12,
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-          boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
-          overflow: "hidden"
-        }}>
-          {/* Header */}
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-soft)", background: "rgba(0,0,0,0.2)" }}>
-            <h2 className="sc-display" style={{ fontSize: 18, margin: 0, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              Lista de Compra
-              <span style={{ fontSize: 13, background: "var(--cyan)22", color: "var(--cyan)", padding: "2px 8px", borderRadius: 999 }}>
-                {purchaseList.length} ítems
-              </span>
-            </h2>
-          </div>
-
-          {/* List Content */}
-          <div style={{ flex: 1, overflowY: "auto", padding: 16 }} className="purchase-list">
-            {purchaseList.length === 0 ? (
-              <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>
-                <ShoppingCart size={48} style={{ opacity: 0.2, marginBottom: 16 }} />
-                <p style={{ fontSize: 14 }}>Escaneá productos para empezar</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {purchaseList.map((item, index) => (
-                  <div key={item.tempId} className="purchase-item" style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    background: "var(--panel-alt)",
-                    border: "1px solid var(--border-soft)",
-                    borderRadius: 8,
-                    padding: "10px 12px",
-                    animation: "sc-fade .2s ease forwards",
-                  }}>
-                    <div style={{
-                      width: 24, height: 24, borderRadius: '50%', background: 'var(--border)', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)'
-                    }}>
-                      {index + 1}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.2 }}>{item.product.name}</div>
-                      <div className="sc-mono" style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 4 }}>
-                        {item.qty} × ${fmtMoney(item.price)}
-                      </div>
-                    </div>
-                    <div className="sc-mono" style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", paddingRight: 8 }}>
-                      ${fmtMoney(item.price * item.qty)}
-                    </div>
-                    <button 
-                      onClick={() => removeFromList(item.tempId)}
-                      disabled={isProcessing}
-                      className="purchase-item-remove sc-focus"
-                      title="Quitar y restaurar stock"
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "var(--red)",
-                        cursor: isProcessing ? "not-allowed" : "pointer",
-                        padding: 8,
-                        borderRadius: 6,
-                        opacity: isProcessing ? 0.5 : 0.8,
-                        transition: "all .15s ease",
-                      }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Footer / Checkout */}
-          <div style={{ borderTop: "1px solid var(--border)", background: "var(--panel)", padding: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
-              <div style={{ fontSize: 14, color: "var(--text-dim)", fontWeight: 500 }}>TOTAL A PAGAR</div>
-              <div className="sc-mono purchase-total" style={{ fontSize: 32, fontWeight: 700, color: "var(--green)", lineHeight: 1 }}>
-                ${fmtMoney(purchaseTotal)}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <PaymentSelector value={paymentMethod} onChange={setPaymentMethod} />
-            </div>
-
-            <button
-              type="button"
-              onClick={confirmPayment}
-              disabled={purchaseList.length === 0 || isProcessing}
-              className="purchase-confirm-btn sc-btn sc-focus"
-              style={{
-                width: "100%",
-                background: "var(--green)",
-                color: "#000",
-                border: "none",
-                borderRadius: 8,
-                padding: "16px 20px",
-                fontWeight: 700,
-                fontSize: 16,
-                cursor: purchaseList.length === 0 || isProcessing ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                opacity: purchaseList.length === 0 ? 0.3 : (isProcessing ? 0.7 : 1),
-                boxShadow: purchaseList.length > 0 ? "0 4px 15px rgba(0, 255, 170, 0.2)" : "none",
-                transition: "all .2s ease"
-              }}
-            >
-              {isProcessing ? "PROCESANDO..." : `COBRAR $${fmtMoney(purchaseTotal)}`}
-            </button>
-          </div>
+                <span>{p.name}</span>
+                <span className="sc-mono">{p.barcode || "s/c"} · stock {available}</span>
+              </button>
+            );
+          })}
         </div>
+      )}
+
+      <div className="caja-body">
+        <TicketGrid
+          lines={lines}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onChangeLine={(id, patch) => setLines((prev) => prev.map((l) => l.tempId === id ? { ...l, ...patch } : l))}
+          onRemove={(id) => setLines((prev) => prev.filter((l) => l.tempId !== id))}
+          disabled={!sessionOpen || processing}
+        />
+        <CheckoutPanel
+          subtotal={totals.subtotal}
+          discount={totals.discount}
+          total={totals.total}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          cashReceived={cashReceived}
+          setCashReceived={setCashReceived}
+          change={change}
+          invoiceType={invoiceType}
+          setInvoiceType={setInvoiceType}
+          customerName={customerName}
+          setCustomerName={setCustomerName}
+          customerDocType={customerDocType}
+          setCustomerDocType={setCustomerDocType}
+          customerDoc={customerDoc}
+          setCustomerDoc={setCustomerDoc}
+          onCharge={confirmPayment}
+          onExact={() => setCashReceived(String(totals.total))}
+          processing={processing}
+          disabled={!sessionOpen}
+          canCharge={canCharge}
+          chargeHint={chargeHint}
+        />
       </div>
+
+      {showOpen && (
+        <OpenSessionModal
+          register={register}
+          busy={processing}
+          onClose={() => setShowOpen(false)}
+          onConfirm={async (fondo) => {
+            setProcessing(true);
+            try {
+              await handleOpenSession({ registerId: register.id, openingFloat: fondo, user: currentUser });
+              addToast("Caja abierta", "success");
+              setShowOpen(false);
+              focusBarcode();
+            } catch (e) {
+              addToast(e.message, "error");
+            } finally {
+              setProcessing(false);
+            }
+          }}
+        />
+      )}
+
+      {showClose && session && (
+        <CloseSessionModal
+          register={register}
+          session={session}
+          movements={cashMovements}
+          busy={processing}
+          onClose={() => setShowClose(false)}
+          onConfirm={async ({ countedCash, notes }) => {
+            if (lines.length) {
+              addToast("Cobrà o vaciá el ticket antes de cerrar la caja.", "error");
+              return;
+            }
+            setProcessing(true);
+            try {
+              const result = await handleCloseSession({ sessionId: session.id, countedCash, notes });
+              const diff = result?.difference ?? 0;
+              addToast(diff === 0 ? "Caja cerrada. Cuadró." : `Caja cerrada. Diferencia: ${diff}`, "success");
+              setShowClose(false);
+            } catch (e) {
+              addToast(e.message, "error");
+            } finally {
+              setProcessing(false);
+            }
+          }}
+        />
+      )}
+
+      {showMove && session && (
+        <CashMoveModal
+          busy={processing}
+          onClose={() => setShowMove(false)}
+          onConfirm={async ({ type, amount, note }) => {
+            setProcessing(true);
+            try {
+              await handleAddMovement({ sessionId: session.id, type, amount, note });
+              addToast("Movimiento registrado", "success");
+              setShowMove(false);
+            } catch (e) {
+              addToast(e.message, "error");
+            } finally {
+              setProcessing(false);
+            }
+          }}
+        />
+      )}
 
       {showCamera && (
-        <CameraScanner
-          onScan={handleCameraScan}
-          onClose={() => setShowCamera(false)}
-        />
+        <CameraScanner onScan={handleCameraScan} onClose={() => setShowCamera(false)} />
       )}
     </div>
   );
